@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% import 'bootstrap/wtf.html' as wtf %}
+
+{% block app_content %}
+
+
+    <table class="table table-hover">
+        <tr>
+          <td>{{_('Log ID')}}</td>
+          <td>{{_('Module')}}</td>
+          <td>{{_('Module ID')}}</td>
+          <td>{{_('Timestamp')}}</td>
+          <td>{{_('Original Data')}}</td>
+          <td>{{_('Updated Column')}}</td>
+          <td>{{_('Updated Data')}}</td>
+          <td>{{_('Type')}}</td>
+          <td>{{_('User')}}</td>
+        </tr>
+
+        {% for l in logs %}
+          <tr>
+            <td> {{ l.id }} </td>
+            <td> {{ l.module }} </td>
+            <td> {{ l.module_id }} </td>
+            <td> {{ l.timestamp}} </td>
+            <td> {{ l.original_data }} </td>
+            <td> {{ l.updated_column }} </td>
+            <td> {{ l.updated_data }} </td>
+            <td> {{ l.type }} </td>
+            <td> {{ l.user.username }} </td>
+          </tr>
+        {% endfor %}
+      </table>
+
+{% endblock %}

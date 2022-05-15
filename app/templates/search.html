@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% import 'bootstrap/wtf.html' as wtf %}
+
+{% block app_content %}
+
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-6">
+
+
+          {% if hits %}
+          <div class="list-group">
+            {% for h in hits %}
+            <a href="{{ h.link }}" class="list-group-item">
+                    <div class="text-nowrap"><h4 class="list-group-item-heading">{{h.module}}: {{ h.title }}</h4></div>
+                    <div class="text-nowrap"><p class="list-group-item-text">{{h.text}}</p></div>
+            </a>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+    </div>
+    <div class="row">
+      <div class="col-sm-6">
+        {% if form %}
+        {{ wtf.quick_form(form) }}
+        {% endif %}
+
+      </div>
+  </div>
+  <div class="row">
+    <div class="col-sm-6">
+      {% if reindex %}
+        {{reindex}}
+      {% endif %}
+
+    </div>
+</div>
+
+</div>
+
+
+
+
+{% endblock %}

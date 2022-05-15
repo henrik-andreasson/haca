@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% import 'bootstrap/wtf.html' as wtf %}
+
+{% block app_content %}
+
+
+{% if racks %}
+  <table class="table table-hover">
+    <tr>
+      <td>{{_('Inventory id')}}</td>
+      <td>{{_('Name')}}</td>
+      <td>{{_('Location')}}</td>
+      <td>{{_('Actions')}}</td>
+    </tr>
+
+    {% for r in racks %}
+
+
+      <tr>
+        <td>  {{ r.inventory_id() }} </td>
+        <td>
+              <A HREF="{{url_for('main.rack_edit', rack=r.id)}}">
+                {{ r.name }}
+              </A>
+        </td>
+        <td>
+                {% if r.localtion %}
+                  {{ r.location.longName() }}
+                {% endif %}
+        </td>
+        <td>
+          <A HREF="{{url_for('main.rack_edit', rack=r.id)}}">
+            {{ _('Edit') }}
+          </A>
+          -
+          <A HREF="{{url_for('main.rack_content', rack=r.id)}}">
+            {{ _('Content') }}
+          </A>
+          -
+          <A HREF="{{url_for('main.rack_audit', rack=r.id)}}">
+            {{ _('Audit') }}
+          </A>
+        </td>
+      </tr>
+    {% endfor %}
+
+  </table>
+
+
+
+
+    <nav aria-label="...">
+        <ul class="pager">
+            <li class="previous{% if not prev_url %} disabled{% endif %}">
+                <a href="{{ prev_url or '#' }}">
+                    <span aria-hidden="true">&larr;</span> {{ _('Previous page') }}
+                </a>
+            </li>
+            <li class="next{% if not next_url %} disabled{% endif %}">
+                <a href="{{ next_url or '#' }}">
+                    {{ _('Next page') }} <span aria-hidden="true">&rarr;</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+{% endif %}
+
+
+
+{% if order == "desc" %}
+  {% set order %}asc{% endset %}
+{% else %}
+  {% set order %}desc{% endset %}
+{% endif %}
+
+{% if servers %}
+<H1>{{server_title}}</H1>
+
+<table class="table table-hover">
+    <tr>
+      <td><A HREF="{{url_for('main.server_list', sort='id',         order=order)}}">{{_('Inventory ID')}}</A></td>
+      <td><A HREF="{{url_for('main.server_list', sort='hostname',   order=order)}}">{{_('Hostname')}}</td>
+      <td><A HREF="{{url_for('main.server_list', sort='ipaddress',  order=order)}}">{{_('IP Address')}}</td>
+      <td><A HREF="{{url_for('main.server_list', sort='service_id', order=order)}}">{{_('Service')}}</td>
+      <td><A HREF="{{url_for('main.server_list', sort='rack_id',    order=order)}}">{{_('Rack Name')}}</td>
+      <td><A HREF="{{url_for('main.server_list', sort='rack_pos',   order=order)}}">{{_('Rack Position')}}</td>
+      <td><A HREF="{{url_for('main.server_list', sort='network_id', order=order)}}">{{_('Network')}}</td>
+    </tr>
+
+    {% for s in servers %}
+
+      <tr>
+        <td>
+              {{ s.inventory_id() }}
+        </td>
+        <td>
+              <A HREF="{{url_for('main.server_edit', server=s.id)}}">
+                {{ s.hostname }}
+              </A>
+        </td>
+        <td>
+                {{s.ipaddress}}
+        </td>
+        <td>
+          {% if s.service %}
+              {{s.service.name}}
+          {% endif %}
+        </td>
+        <td>
+          {% if s.rack %}
+                {{s.rack.name}}
+          {% endif %}
+        </td>
+        <td>
+          {{s.rack_position}}
+        </td>
+        <td>
+          {% if s.network %}
+            {{s.network.name}}
+          {% endif %}
+        </td>
+
+      </tr>
+    {% endfor %}
+
+    </table>
+
+
+    <nav aria-label="...">
+        <ul class="pager">
+            <li class="previous{% if not prev_url %} disabled{% endif %}">
+                <a href="{{ prev_url or '#' }}">
+                    <span aria-hidden="true">&larr;</span> {{ _('Previous page') }}
+                </a>
+            </li>
+            <li class="next{% if not next_url %} disabled{% endif %}">
+                <a href="{{ next_url or '#' }}">
+                    {{ _('Next page') }} <span aria-hidden="true">&rarr;</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+{% endif %}
+
+
+{% if firewalls %}
+<H1>{{firewall_title}}</H1>
+
+<table class="table table-hover">
+    <tr>
+      <td>{{_('Inventory id')}}</td>
+      <td>{{_('Name')}}</td>
+      <td>{{_('Alias')}}</td>
+      <td>{{_('Service')}}</td>
+      <td>{{_('Rack')}}</td>
+      <td>{{_('Actions')}}</td>
+    </tr>
+
+    {% for f in firewalls %}
+
+      <tr>
+        <td>
+              {{ f.inventory_id() }}
+        </td>
+        <td>
+                {{ f.name }}
+        </td>
+        <td>
+                {{f.alias}}
+        </td>
+        <td>
+          {% if f.service %}
+              {{f.service.name}}
+          {% endif %}
+        </td>
+        <td>
+          {% if f.rack %}
+                {{f.rack.name}}
+          {% endif %}
+        </td>
+        <td>
+          <A HREF="{{url_for('main.firewall_edit', firewall=f.id)}}"> {{ _('Edit') }}</A>
+          -
+          <A HREF="{{url_for('main.firewall_port_list', firewall=f.id)}}"> {{ _('List Ports') }}</A>
+
+        </td>
+
+      </tr>
+    {% endfor %}
+
+
+    </table>
+
+
+    <nav aria-label="...">
+        <ul class="pager">
+            <li class="previous{% if not prev_url %} disabled{% endif %}">
+                <a href="{{ prev_url or '#' }}">
+                    <span aria-hidden="true">&larr;</span> {{ _('Previous page') }}
+                </a>
+            </li>
+            <li class="next{% if not next_url %} disabled{% endif %}">
+                <a href="{{ next_url or '#' }}">
+                    {{ _('Next page') }} <span aria-hidden="true">&rarr;</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+
+{% endif %}
+
+{% if switchs %}
+<H1>{{switch_title}}</H1>
+
+<table class="table table-hover">
+    <tr>
+      <td>{{_('Inventory id')}}</td>
+      <td>{{_('Name')}}</td>
+      <td>{{_('Alias')}}</td>
+      <td>{{_('Service')}}</td>
+      <td>{{_('Rack')}}</td>
+      <td>{{_('Actions')}}</td>
+    </tr>
+
+    {% for s in switchs %}
+
+      <tr>
+        <td>
+              {{ s.inventory_id() }}
+        </td>
+        <td>
+                {{ s.name }}
+        </td>
+        <td>
+                {{s.alias}}
+        </td>
+        <td>
+          {% if s.service %}
+              {{s.service.name}}
+          {% endif %}
+        </td>
+        <td>
+          {% if s.rack %}
+                {{s.rack.name}}
+          {% endif %}
+        </td>
+        <td>
+          <A HREF="{{url_for('main.switch_edit', switch=s.id)}}"> {{ _('Edit') }}</A> <br/>
+          <A HREF="{{url_for('main.switch_port_list', switch=s.id)}}"> {{ _('List Ports') }}</A>
+        </td>
+
+      </tr>
+    {% endfor %}
+
+
+    </table>
+
+
+    <nav aria-label="...">
+        <ul class="pager">
+            <li class="previous{% if not prev_url %} disabled{% endif %}">
+                <a href="{{ prev_url or '#' }}">
+                    <span aria-hidden="true">&larr;</span> {{ _('Previous page') }}
+                </a>
+            </li>
+            <li class="next{% if not next_url %} disabled{% endif %}">
+                <a href="{{ next_url or '#' }}">
+                    {{ _('Next page') }} <span aria-hidden="true">&rarr;</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+
+{% endif %}
+
+
+{% if form %}
+      {{ wtf.quick_form(form) }}
+{% endif %}
+
+
+{% endblock %}

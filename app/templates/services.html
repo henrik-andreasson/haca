@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block app_content %}
+
+
+<table class="table table-hover">
+    <tr>
+      <td>{{_('Inventory id')}}</td>
+      <td>{{_('Service')}}</td>
+      <td>{{_('Users')}}</td>
+      <td>{{_('Manager')}}</td>
+      <td>{{_('Color')}}</td>
+    </tr>
+
+    {% for service in services %}
+
+      <tr>
+        <td>  {{ service.inventory_id() }} </td>
+        {% set service_link %}
+          <a href="{{ url_for('main.service_edit', name=service.name) }}">
+            {{ service.name }}
+          </a>
+        {% endset %}
+
+        <td>
+              {{ _('%(service)s', service=service_link ) }}
+        </td>
+        <td>
+              {% for u in service.users %}
+                {{u.username}}
+              {% endfor %}
+            </td>
+          <td>
+                    {{service.manager.username}}
+          </td>
+
+        <td>
+          <div style="background: {{service.color}}">
+              {{ service.color }}
+           </div>
+        </td>
+
+        </tr>
+        {% endfor %}
+
+    </table>
+
+    <nav aria-label="...">
+        <ul class="pager">
+            <li class="previous{% if not prev_url %} disabled{% endif %}">
+                <a href="{{ prev_url or '#' }}">
+                    <span aria-hidden="true">&larr;</span> {{ _('Previous page') }}
+                </a>
+            </li>
+            <li class="next{% if not next_url %} disabled{% endif %}">
+                <a href="{{ next_url or '#' }}">
+                    {{ _('Next page') }} <span aria-hidden="true">&rarr;</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+{% endblock %}

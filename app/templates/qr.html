@@ -1,0 +1,89 @@
+<html>
+<body>
+
+
+<table class="table table-hover">
+    <tr>
+        <td>
+          {% if server %}
+
+            <a href="{{ url_for('main.server_edit', server=server.id)}}">
+              <img width="200" height="200"> src="{{ url_for('main.qr_img', id=server.id, module='server', _external=True) }}" />
+            </a>
+          {% elif firewall %}
+          <a href="{{ url_for('main.firewall_edit', firewall=firewall.id)}}">
+              <img src="{{ url_for('main.qr_img', id=firewall.id, module='firewall', _external=True) }}" />
+            </a>
+          {% elif hsmpcicard %}
+            <a href="{{ url_for('main.hsm_pcicard_edit', id=hsmpcicard.id)}}">
+                <img src="{{ url_for('main.qr_img', id=hsmpcicard.id, module='hsmpcicard', _external=True) }}" />
+              </a>
+          {% elif hsmbackupunit %}
+              <a href="{{ url_for('main.hsm_backupunit_edit', id=hsmbackupunit.id)}}">
+                  <img src="{{ url_for('main.qr_img', id=hsmbackupunit.id, module='hsmbackupunit', _external=True) }}" />
+              </a>
+
+          {% elif hsmped %}
+              <a href="{{ url_for('main.hsm_ped_edit', id=hsmped.id)}}">
+                  <img src="{{ url_for('main.qr_img', id=hsmped.id, module='hsmped', _external=True) }}" />
+              </a>
+
+          {% elif hsmpin %}
+                <a href="{{ url_for('main.hsm_pin_edit', id=hsmpin.id)}}">
+                    <img src="{{ url_for('main.qr_img', id=hsmpin.id, module='hsmpin', _external=True) }}" />
+                </a>
+
+          {% elif switch %}
+              <a href="{{ url_for('main.switch_edit', id=switch.id)}}">
+                  <img src="{{ url_for('main.qr_img', id=switch.id, module='switch', _external=True) }}" />
+              </a>
+
+          {% elif rack %}
+              <a href="{{ url_for('main.rack_edit', id=rack.id)}}">
+                  <img src="{{ url_for('main.qr_img', id=rack.id, module='rack', _external=True) }}" />
+              </a>
+
+          {% endif %}
+
+        </td>
+    </tr>
+    <tr>
+      <td style="text-align:center">
+        {% if server %}
+          <h2>server-{{server.id}} - {{server.hostname}}</h2>
+
+        {% elif firewall %}
+          <h2>firewall-{{firewall.id}} - {{firewall.name}}</h2>
+
+        {% elif hsmpcicard %}
+          <h2>hsmpcicard-{{hsmpcicard.id}} - {{hsmpcicard.name}}</h2>
+
+        {% elif hsmbackupunit %}
+          <h2>hsmbackupunit-{{hsmbackupunit.id}} - {{hsmbackupunit.name}}</h2>
+
+        {% elif hsmped %}
+          <h2>hsmped-{{hsmped.id}} - {{hsmped.type}} - {{hsmped.keyno}} - {{hsmped.keysn}} - {{hsmped.hsmdomain.name}}</h2>
+
+        {% elif hsmpin %}
+          <h2>hsmpin-{{hsmpin.id}} - {{hsmpin.compartment.name}}</h2>
+
+        {% elif switch %}
+          <h2>switch-{{switch.id}} - {{switch.name}}</h2>
+
+        {% elif rack %}
+          <h2>rack-{{rack.id}} - {{rack.name}}</h2>
+
+        {% elif safe %}
+            <h2>safe-{{safe.id}} - {{safe.name}}</h2>
+
+        {% elif compartment %}
+            <h2>compartment-{{compartment.id}} - {{compartment.name}} - {{compartment.user.username}}</h2>
+
+        {% endif %}
+
+      </td>
+</tr>
+
+
+</body>
+</html>

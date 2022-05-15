@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% import 'bootstrap/wtf.html' as wtf %}
+
+{% block app_content %}
+    <h1>{{ _('Pending Updates') }}</h1>
+
+
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-8">
+
+
+    {% if hsmpedupdates %}
+        <div class="list-group">
+          <a href="{{ url_for('main.hsm_ped_list')}}" class="list-group-item">
+            <h4 class="list-group-item-heading">{{_('HSM Ped Pending Updates')}}</h4>
+          </a>
+          {% for p in hsmpedupdates %}
+            <a href="{{ url_for('main.hsm_ped_approve', ped=p.id) }}" class="list-group-item">
+              {{p.keysn}} - {{p.keyno}} - {{p.hsmdomain.name}}
+            </a>
+          {% endfor %}
+        </div>
+    {% endif %}
+
+  </div>
+</div>
+
+
+{% endblock %}

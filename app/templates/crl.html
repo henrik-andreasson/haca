@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% import 'bootstrap/wtf.html' as wtf %}
+
+{% block app_content %}
+
+
+
+{% if crl %}
+  <table class="table table-hover">
+    <tr>
+      <td>{{_('id')}}</td>
+      <td>{{_('CA Name')}}</td>
+      <td>{{_('Validity start')}}</td>
+      <td>{{_('Validity stop')}}</td>
+    </tr>
+
+      <tr>
+        <td>  {{ crl.id }} </td>
+        <td>
+                {% if crl.ca %}
+                  {{ crl.ca.name }}
+                {% endif %}
+        </td>
+        <td> {{ crl.validity_start }} </td>
+        <td> {{ crl.validity_end }} </td>
+      </tr>
+      <tr>
+        <td>  {{ _('CRL') }} </td>
+        <td>
+<span id="crl">{{crl.pem}}</span>
+        </td>
+        <td>
+          <button type="button" class="btn btn-primary" onclick="copyToClipboard('#crl', this)">{{_('Copy CRL')}}</button>
+        </td>
+
+      </tr>
+  </table>
+
+{% endif %}
+{% if crls %}
+  <table class="table table-hover">
+    <tr>
+      <td>{{_('id')}}</td>
+      <td>{{_('CA Name')}}</td>
+      <td>{{_('Validity start')}}</td>
+      <td>{{_('Validity stop')}}</td>
+      <td>{{_('Info')}}</td>
+      <td>{{_('Download')}}</td>
+      <td>{{_('Delete')}}</td>
+    </tr>
+
+    {% for c in crls %}
+
+
+      <tr>
+        <td>  {{ c.id }} </td>
+        <td>
+                {% if c.ca %}
+                  {{ c.ca.name }}
+                {% endif %}
+        </td>
+        <td> {{ c.validity_start }} </td>
+        <td> {{ c.validity_end }} </td>
+        <td>  <A HREF="{{url_for('main.crl_info', id=c.id)}}"> {{ _('Info') }}</A> <br/>
+ </td>
+        <td>  <A HREF="{{url_for('main.crl_get', id=c.id)}}"> {{ _('Download') }}</A> <br/>
+</td>
+        <td>  <A HREF="{{url_for('main.crl_delete', id=c.id)}}"> {{ _('Delete') }}</A> <br/>
+</td>
+      </tr>
+    {% endfor %}
+
+  </table>
+
+
+
+
+    <nav aria-label="...">
+        <ul class="pager">
+            <li class="previous{% if not prev_url %} disabled{% endif %}">
+                <a href="{{ prev_url or '#' }}">
+                    <span aria-hidden="true">&larr;</span> {{ _('Previous page') }}
+                </a>
+            </li>
+            <li class="next{% if not next_url %} disabled{% endif %}">
+                <a href="{{ next_url or '#' }}">
+                    {{ _('Next page') }} <span aria-hidden="true">&rarr;</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+{% endif %}
+
+
+
+{% if order == "desc" %}
+  {% set order %}asc{% endset %}
+{% else %}
+  {% set order %}desc{% endset %}
+{% endif %}
+
+
+
+{% if form %}
+      {{ wtf.quick_form(form) }}
+{% endif %}
+
+
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% import 'bootstrap/wtf.html' as wtf %}
+
+
+{% block app_content %}
+    <h1>{{ title }}</h1>
+
+    {% if form %}
+    <div class="row">
+        <div class="col-md-4">
+            {{ wtf.quick_form(form) }}
+        </div>
+    </div>
+
+
+    {% endif %}
+
+    <h1>{{ _('List Services') }}</h1>
+    {% if services %}
+      {% for service in services %}
+          {% include '_service.html' %}
+      {% endfor %}
+    {% endif %}
+
+    {% if service %}
+        {% include '_service.html' %}
+    {% endif %}
+
+
+{% endblock %}

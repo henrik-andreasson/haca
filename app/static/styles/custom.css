@@ -1,0 +1,17 @@
+div.required label:after {
+    content: " *";
+    color: red;
+}
+.modal-content {
+  font-size: 10px;
+  font-family: monospace;
+}
+
+span {
+    width: 600px;
+    word-wrap: break-word;
+    display: inline-block;
+    font-size: 14px;
+    font-family: monospace;
+    white-space: pre-line;
+}
