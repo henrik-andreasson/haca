@@ -115,7 +115,7 @@ class CertificationAuthority(db.Model):
         cert = cert.public_key(key.public_key())
         cert = cert.serial_number(x509.random_serial_number())
         cert = cert.not_valid_before(certificate.validity_start)
-        cert = cert.not_valid_after(certificate.validity_start)
+        cert = cert.not_valid_after(certificate.validity_end)
         cert = cert.add_extension(
             x509.BasicConstraints(ca=True, path_length=0), critical=True,
         )
@@ -195,27 +195,32 @@ class CertificationAuthority(db.Model):
         from cryptography.hazmat.primitives import hashes
         from cryptography.x509.oid import ExtendedKeyUsageOID, AuthorityInformationAccessOID
 
+        temp_key = None
+        if keys.key is None:
         # Generate our key
-        temp_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-        )
-
-        # Write our key to disk for safe keeping
-        cert_keyfile = f"cert-{certificate.name}-key.pem"
-        cert_certfile = f"cert-{certificate.name}-cert.pem"
-#        ca_keyfile = f"ca-{self.name}-key.pem"
-
-        with open(cert_keyfile, "wb") as f:
-            f.write(temp_key.private_bytes(
+            temp_key = rsa.generate_private_key(
+                public_exponent=65537,
+                key_size=2048,
+                )
+            keys.keys = temp_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.BestAvailableEncryption(cert_passphrase),
-            ))
-        keys.keys = temp_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.BestAvailableEncryption(cert_passphrase))
+                encryption_algorithm=serialization.BestAvailableEncryption(cert_passphrase))
+        else:
+            temp_key = serialization.load_pem_private_key(
+                keys.key, password=keys.password)
+
+# Write our key to disk for safe keeping
+#        cert_keyfile = f"cert-{certificate.name}-key.pem"
+#        cert_certfile = f"cert-{certificate.name}-cert.pem"
+#        ca_keyfile = f"ca-{self.name}-key.pem"
+
+        # with open(cert_keyfile, "wb") as f:
+        #     f.write(temp_key.private_bytes(
+        #         encoding=serialization.Encoding.PEM,
+        #         format=serialization.PrivateFormat.TraditionalOpenSSL,
+        #         encryption_algorithm=serialization.BestAvailableEncryption(cert_passphrase),
+        #     ))
 
         subjectname_components = []
         if certificate.name is not None:
@@ -254,7 +259,7 @@ class CertificationAuthority(db.Model):
 
             sandnslist.append(x509.DNSName(certificate.name))
 
-            cert = cert.add_extension(x509.SubjectAlternativeName(sandnslist), critical=True)
+            cert = cert.add_extension(x509.SubjectAlternativeName(sandnslist), critical=False)
 
         if certificate.profile == "server":
             cert = cert.add_extension(x509.ExtendedKeyUsage([
@@ -320,6 +325,23 @@ class CertificationAuthority(db.Model):
                     decipher_only=False,
                 ), critical=True)
 
+        if certificate.profile == "ocsp":
+            cert = cert.add_extension(x509.ExtendedKeyUsage([
+                                                ExtendedKeyUsageOID.OCSP_SIGNING
+                ]), critical=True)
+
+            cert = cert.add_extension(x509.KeyUsage(
+                    digital_signature=True,
+                    content_commitment=False,
+                    key_encipherment=False,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=False,
+                    crl_sign=False,
+                    encipher_only=False,
+                    decipher_only=False,
+                ), critical=True)
+
         if self.crl_cdp is not None:
             cert = cert.add_extension(x509.CRLDistributionPoints([
                     x509.DistributionPoint(
@@ -330,7 +352,7 @@ class CertificationAuthority(db.Model):
                         reasons=None,
                         crl_issuer=None
                     )
-                ]), critical=True)
+                ]), critical=False)
 
         if self.ocsp_url is not None:
             cert = cert.add_extension(x509.AuthorityInformationAccess([
@@ -338,24 +360,24 @@ class CertificationAuthority(db.Model):
                         AuthorityInformationAccessOID.OCSP,
                         x509.UniformResourceIdentifier(self.ocsp_url)
                     )
-                ]), critical=True)
+                ]), critical=False)
 
         ca_pk = serialization.load_pem_private_key(
           self.keys.key, password=ca_passphrase)
 
         # add aki
         cert = cert.add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(
-                ca_pk.public_key()), critical=True)
+                ca_pk.public_key()), critical=False)
         # add ski
         cert = cert.add_extension(x509.SubjectKeyIdentifier.from_public_key(
                 temp_key.public_key()
-            ), critical=True)
+            ), critical=False)
 
         cert = cert.sign(ca_pk, hashes.SHA256())
         certificate.cert_obj = cert
         # Write our certificate out to disk.
-        with open(cert_certfile, "wb") as f:
-            f.write(cert.public_bytes(serialization.Encoding.PEM))
+#        with open(cert_certfile, "wb") as f:
+#            f.write(cert.public_bytes(serialization.Encoding.PEM))
 
         return cert
 
@@ -379,7 +401,7 @@ class CertificationAuthority(db.Model):
             333
         ).revocation_date(
             datetime.datetime.today()
- 
+
         ).build()
         builder = builder.add_revoked_certificate(revoked_cert)
 

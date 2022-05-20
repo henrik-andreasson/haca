@@ -1,5 +1,5 @@
 from flask import Blueprint
 
-bp = Blueprint('safe', __name__)
+bp = Blueprint('ocsp', __name__)
 
-from app.modules.safe import routes
+from app.modules.ocsp import routes

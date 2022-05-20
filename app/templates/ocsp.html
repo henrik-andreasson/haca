@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% import 'bootstrap/wtf.html' as wtf %}
+
+{% block app_content %}
+
+
+<!-- display one cert -->
+
+
+  {% if cert %}
+  <table class="table table-hover">
+    <tr>  <td>{{_('Inventory id')}}</td>         <td>   {{ cert.inventory_id() }}   </td> <td><A HREF="{{url_for('main.cert_edit', id=cert.id)}}"> {{ _('Edit') }}</A></td></tr>
+    <tr>  <td>{{_('Name')}}</td>                 <td>   {{ cert.name }}   </td>           <td></td></tr>
+    <tr>  <td>{{_('Status')}}</td>               <td>   {{ cert.status }}   </td>         <td></td></tr>
+    <tr>  <td>{{_('CA')}}</td>                   <td>   {{ cert.ca.name }}   </td>        <td></td></tr>
+
+               <tr>
+                 <td>{{_('Cert')}}</td>
+                 <td>
+<span id="cert">{{htmlcert}}</span>
+                 </td>
+                 <td>
+                   <button type="button" class="btn btn-primary" onclick="copyToClipboard('#cert', this)">{{_('Copy Certificate')}}</button>
+                 </td>
+               </tr>
+             {% if pemkey %}
+               <tr>
+                 <td>{{_('Key')}}</td>
+                 <td>
+<span id="key">{{pemkey}}</span>
+                 </td>
+                 <td>
+                   <button type="button" class="btn btn-primary" onclick="copyToClipboard('#key', this)">{{_('Copy Key')}}</button>
+                 </td>
+               </tr>
+             {% endif %}
+
+                 <tr>
+                   <td>{{_('CA Cert')}}
+                   </td>
+                   <td>
+<span id="ca">{{cert.ca.certificate.cert}}</span>
+                   </td>
+                   <td>
+                     <button type="button" class="btn btn-primary" onclick="copyToClipboard('#ca', this)">{{_('Copy CA cert')}}</button>
+                   </td>
+                 </tr>
+
+  </table>
+
+    <nav aria-label="...">
+        <ul class="pager">
+            <li class="previous{% if not prev_url %} disabled{% endif %}">
+                <a href="{{ prev_url or '#' }}">
+                    <span aria-hidden="true">&larr;</span> {{ _('Previous page') }}
+                </a>
+            </li>
+            <li class="next{% if not next_url %} disabled{% endif %}">
+                <a href="{{ next_url or '#' }}">
+                    {{ _('Next page') }} <span aria-hidden="true">&rarr;</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+  {% endif %}
+
+  <!-- when listing certs -->
+
+  {% if ocsps %}
+    <table class="table table-hover">
+      <tr>
+        <td>{{_('Inventory id')}}</td>
+        <td>{{_('Name')}}</td>
+        <td>{{_('Status')}}</td>
+        <td>{{_('CA')}}</td>
+      </tr>
+
+      {% for o in ocsps %}
+
+        <tr>
+          <td>
+                {{ o.inventory_id() }}
+          </td>
+          <td>
+                  {{ o.name }}
+          </td>
+          <td>
+                  {{o.status}}
+          </td>
+          <td>
+                  {{o.ca.name}}
+          </td>
+
+        </tr>
+      {% endfor %}
+
+
+      </table>
+
+
+      <nav aria-label="...">
+          <ul class="pager">
+              <li class="previous{% if not prev_url %} disabled{% endif %}">
+                  <a href="{{ prev_url or '#' }}">
+                      <span aria-hidden="true">&larr;</span> {{ _('Previous page') }}
+                  </a>
+              </li>
+              <li class="next{% if not next_url %} disabled{% endif %}">
+                  <a href="{{ next_url or '#' }}">
+                      {{ _('Next page') }} <span aria-hidden="true">&rarr;</span>
+                  </a>
+              </li>
+          </ul>
+      </nav>
+
+    {% endif %}
+
+      {% if form %}
+          {{ wtf.quick_form(form) }}
+      {% endif %}
+
+
+{% endblock %}

@@ -62,13 +62,9 @@ def create_app(config_class=Config):
     from app.modules.crl import bp as crl_bp
     app.register_blueprint(crl_bp, url_prefix='/crl')
 
-    #
-    # from app.modules.qr import bp as keys_bp
-    # app.register_blueprint(keys_bp, url_prefix='/keys')
-    #
-    # from app.modules.qr import bp as ocsp_bp
-    # app.register_blueprint(ocsp_bp, url_prefix='/ocsp')
-    #
+    from app.modules.ocsp import bp as ocsp_bp
+    app.register_blueprint(ocsp_bp, url_prefix='/ocsp')
+
     # from app.modules.qr import bp as qr_bp
     # app.register_blueprint(qr_bp, url_prefix='/qr')
 

@@ -51,7 +51,7 @@ def format_public_key(public_key=None):
     public_key2 = public_key2.replace(' ', '')
     return public_key2
 
-
+ 
 class Certificate(db.Model):
     __tablename__ = "certificate"
     __searchable__ = ['name', 'comment', 'status', 'serial']

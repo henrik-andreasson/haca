@@ -1,351 +1,228 @@
-from flask import render_template, flash, redirect, url_for, request, current_app
-from flask_login import login_required, current_user
+from flask import render_template, flash, redirect, url_for, request, \
+  current_app, make_response
+from flask_login import login_required
 from app import db
 from app.main import bp
-from app.main.models import Location, User
-from app.modules.hsm.models import HsmBackupUnit, HsmPed, HsmPin
-from app.modules.safe.models import Safe, Compartment
-from app.modules.safe.forms import SafeForm, CompartmentForm, AuditCompartmentForm, AuditSafeForm
+from app.modules.ocsp.models import Ocsp
+from app.modules.ocsp.forms import OcspForm, FilterOcspListForm
 from flask_babel import _
-from datetime import datetime
 from sqlalchemy import desc, asc
+from app.modules.ca.models import CertificationAuthority
+from app.modules.keys.models import Keys
+from cryptography.hazmat.primitives import serialization
+from cryptography import x509
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509 import ocsp
 
 
-@bp.route('/safe/add', methods=['GET', 'POST'])
+@bp.route('/ocsp/add', methods=['GET', 'POST'])
 @login_required
-def safe_add():
+def ocsp_add():
     if 'cancel' in request.form:
         return redirect(request.referrer)
 
-    form = SafeForm(formdata=request.form)
+    form = OcspForm(formdata=request.form)
 
     if request.method == 'POST' and form.validate_on_submit():
 
-        location = Location.query.get(form.location.data)
-        safe = Safe(name=form.name.data)
-        safe.location = location
-        db.session.add(safe)
+        ca = CertificationAuthority.query.get(form.ca.data)
+        if ca is None:
+            flash('CA is required')
+            return redirect(request.referrer)
+
+        # use ca to generate cert
+        ocsp_responder = Ocsp(status=form.status.data,
+                    validity_start=form.validity_start.data,
+                    validity_end=form.validity_end.data,
+                    comment=form.comment.data,
+                    )
+        ocsp_responder.ca = ca
+        certname_set = False
+        if form.name.data is not None:
+            ocsp_responder.name = form.name.data
+            certname_set = True
+        if form.serial.data is not None:
+            ocsp_responder.serial = form.serial.data
+            certname_set = True
+        if form.orgunit.data is not None:
+            ocsp_responder.orgunit = form.orgunit.data
+            certname_set = True
+        if form.org.data is not None:
+            ocsp_responder.org = form.org.data
+            certname_set = True
+        if form.country.data is not None:
+            ocsp_responder.country = form.country.data
+            certname_set = True
+
+        ocsp_responder.profile = "ocsp"
+
+        # todo inline check, see auth username ...
+        if certname_set is False:
+            flash('At least one name field is required')
+            return redirect(request.referrer)
+
+        key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+        )
+        keys = Keys(key=key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.BestAvailableEncryption(b"foo123")),
+                password=b"foo123")
+        signed = ca.create_cert(ocsp_responder, b"foo123", b"foo123", keys)
+
+        pemcert = signed.public_bytes(serialization.Encoding.PEM).decode()
+
+#        db.session.add(keys)
+        ocsp_responder.keys = keys
+        ocsp_responder.cert = pemcert
+
+        db.session.add(keys)
+        db.session.add(ocsp_responder)
         db.session.commit()
-         #  audit.auditlog_new_post('safe', original_data=safe.to_dict(), record_name=safe.name)
 
-        flash(_('New Safe is now posted!'))
+        flash(_(f'The new cert is now created {ocsp_responder.name}!'))
 
-        return redirect(url_for('main.index'))
-
+        return render_template('ocsp.html', title=_('OCSP Certificate created'),
+                               cert=ocsp_responder, htmlcert=pemcert
+                               )
     else:
-
-        return render_template('safe.html', title=_('Safe'),
+        return render_template('ocsp.html', title=_('Add OCSP Certificate'),
                                form=form)
 
 
-@bp.route('/safe/edit/', methods=['GET', 'POST'])
+@bp.route('/ocsp/list/', methods=['GET', 'POST'])
 @login_required
-def safe_edit():
-
-    safeid = request.args.get('safe')
-
-    if 'cancel' in request.form:
-        return redirect(request.referrer)
-    if 'delete' in request.form:
-        return redirect(url_for('main.safe_delete', safe=safeid))
-    if 'qrcode' in request.form:
-        return redirect(url_for('main.safe_qr', id=safeid))
-
-    safe = Safe.query.get(safeid)
-    form = SafeForm(obj=safe)
-
-    if safe is None:
-        flash(_('Safe not found'))
-        return redirect(request.referrer)
-
-    original_data = safe.to_dict()
-
-    if request.method == 'POST' and form.validate_on_submit():
-        location = Location.query.get(form.location.data)
-
-        safe.name = form.name.data
-        safe.location = location
-        db.session.commit()
-         #  audit.auditlog_update_post('safe', original_data=original_data, updated_data=safe.to_dict(), record_name=safe.name)
-
-        flash(_('Your changes to the safe have been saved.'))
-
-        return redirect(url_for('main.index'))
-
-    else:
-        form.location.data = safe.location_id
-
-        return render_template('safe.html', title=_('Edit Safe'),
-                               form=form)
-
-
-@bp.route('/safe/list/', methods=['GET', 'POST'])
-@login_required
-def safe_list():
+def ocsp_list():
 
     page = request.args.get('page', 1, type=int)
 
-    safes = Safe.query.order_by(Safe.name).paginate(
+    form = FilterOcspListForm()
+
+    ocsps1 = Ocsp.query.order_by(Ocsp.id).all()
+    ocsps = Ocsp.query.order_by(Ocsp.id).paginate(
             page, current_app.config['POSTS_PER_PAGE'], False)
-
-    next_url = url_for('main.safe_list', page=safes.next_num) \
-        if safes.has_next else None
-    prev_url = url_for('main.safe_list', page=safes.prev_num) \
-        if safes.has_prev else None
-
-    return render_template('safe.html', title=_('Safe'),
-                           safes=safes.items, next_url=next_url,
-                           prev_url=prev_url)
-
-
-@bp.route('/safe/content/', methods=['GET', 'POST'])
-@login_required
-def safe_content():
-
-    safeid = request.args.get('safe')
-    safe = Safe.query.get(safeid)
-    if safe is None:
-        flash(_('Safe not found'))
-        return redirect(request.referrer)
-
-    hsmbackupunits = HsmBackupUnit.query.filter_by(safe_id=safe.id)
-    compartments = Compartment.query.filter_by(safe_id=safe.id)
-
-    return render_template('safe.html', title=_('Safe'),
-                           compartments=compartments,
-                           hsmbackupunits=hsmbackupunits)
-
-
-@bp.route('/safe/delete/', methods=['GET', 'POST'])
-@login_required
-def safe_delete():
-
-    safeid = request.args.get('safe')
-    safe = Safe.query.get(safeid)
-
-    if safe is None:
-        flash(_('Safe was not deleted, id not found!'))
-        return redirect(url_for('main.index'))
-
-    deleted_msg = 'Safe deleted: %s %s' % (safe.name,
-                                           safe.location.longName())
-    db.session.delete(safe)
-    db.session.commit()
-     #  audit.auditlog_delete_post('safe', data=safe.to_dict(), record_name=safe.name)
-    flash(deleted_msg)
-
-    return redirect(url_for('main.index'))
-
-
-@bp.route('/compartment/add', methods=['GET', 'POST'])
-@login_required
-def compartment_add():
-    if 'cancel' in request.form:
-        return redirect(request.referrer)
-
-    form = CompartmentForm(formdata=request.form)
-
-    form.safe.choices = [(s.id, s.name) for s in Safe.query.all()]
-    form.user.choices = [(u.id, u.username) for u in User.query.all()]
+    for o in ocsps1:
+        print(f'debug ocsp:{o.name}')
 
     if request.method == 'POST' and form.validate_on_submit():
-        user = User.query.get(form.user.data)
-        safe = Safe.query.get(form.safe.data)
-        compartment = Compartment(name=form.name.data)
-        compartment.safe = safe
-        compartment.user = user
-        db.session.add(compartment)
-        db.session.commit()
-         #  audit.auditlog_new_post('compartment', original_data=compartment.to_dict(), record_name=compartment.name)
 
-        flash(_('New Compartment is now posted!'))
+        if form.ca.data is not None:
+            ca = CertificationAuthority.query.get(form.ca.data)
+            if ca is not None:
+                ocsps = Ocsp.query.filter_by(ca_id=ca.id).paginate(
+                    page, current_app.config['POSTS_PER_PAGE'], False)
 
-        return redirect(url_for('main.index'))
+    next_url = url_for('main.cert_list', page=ocsps.next_num) \
+        if ocsps.has_next else None
+    prev_url = url_for('main.certs_list', page=ocsps.prev_num) \
+        if ocsps.has_prev else None
 
-    else:
-
-        return render_template('safe.html', title=_('Compartment'),
-                               form=form)
+    return render_template('ocsp.html', title=_('OCSP'),
+                           ocsps=ocsps.items, next_url=next_url,
+                           prev_url=prev_url, form=form)
 
 
-@bp.route('/compartment/edit/', methods=['GET', 'POST'])
-@login_required
-def compartment_edit():
+@bp.route('/ocsp/query/', methods=['GET', 'POST'])
+def ocsp_query():
 
-    compartmentid = request.args.get('compartment')
+    length = int(request.headers['content-length'])
+    if length > 10000:
+        print(f'to much data {length}')
+        return None
 
-    if 'cancel' in request.form:
-        return redirect(request.referrer)
-    if 'delete' in request.form:
-        return redirect(url_for('main.compartment_delete', compartment=compartmentid))
-    if 'qrcode' in request.form:
-        return redirect(url_for('main.compartment_qr', id=compartmentid))
+    data = request.get_data(cache=False, as_text=False, parse_form_data=False)
+    import pprint
+    pp = pprint.PrettyPrinter()
+    pp.pprint(data)
+    ocsp_req = ocsp.load_der_ocsp_request(data)
+    print(f'''
+ocsp req serial:  {ocsp_req.serial_number}
+issuer_key hash:  {ocsp_req.issuer_key_hash}
+issuer_name_hash: {ocsp_req.issuer_name_hash}
+hash_algorithm:   {ocsp_req.issuer_name_hash}
+''')
+    for e in ocsp_req.extensions:
+        print(f'extensions:       {e}')
 
-    compartment = Compartment.query.get(compartmentid)
-    original_data = compartment.to_dict()
+    responder = Ocsp.query.order_by(Ocsp.validity_end).first()
+    # loop the cert and select the best
 
-    form = CompartmentForm(obj=compartment)
+    import datetime
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.x509 import load_pem_x509_certificate
 
-    if compartment is None:
-        flash(_('Compartment not found'))
-        return redirect(request.referrer)
+    pem_issuer = b'''-----BEGIN CERTIFICATE-----
+MIIC/DCCAeSgAwIBAgIUNhLv1R6WGrrAebORpBxc0hqW27cwDQYJKoZIhvcNAQEL
+BQAwLDELMAkGA1UEBhMCU0UxDzANBgNVBAoMBlRlc3RDQTEMMAoGA1UEAwwDYmJi
+MB4XDTIyMDUxOTAwMDAwMFoXDTMyMDUxOTAwMDAwMFowLDELMAkGA1UEBhMCU0Ux
+DzANBgNVBAoMBlRlc3RDQTEMMAoGA1UEAwwDYmJiMIIBIjANBgkqhkiG9w0BAQEF
+AAOCAQ8AMIIBCgKCAQEAysy7tW73d33//1Y8W9mQ7GOPGWg3B0ZS9UEDAdBrfQY2
+bOLcTZB3Luy3etRDl+0rESXq4D1EFJL9Sqf6lPsDXp5xbDj8D4fOxzsUP26C7FSQ
+i/RDTdcd9TruQbnUIwXiERQZOBpMAvugbbGJYdoA0vrMRKT1jUeyemLHpy17/JXc
+0DCKWQqfGRPz57zaTEtVo77ZZk6x/KmAEgxzrpESmUCohgUvtwmGQQ/d7OPNfVdK
+V+uAQrWemEv5LPmXBixE7lkGqgfpTAsHexy019Hrb6prY6GyiKgsbYAORkdQ6IbG
+a0XmbyPbdOrsrugS/yKrQ6mpAAZdVLKb4E+XDQFpIQIDAQABoxYwFDASBgNVHRMB
+Af8ECDAGAQH/AgEAMA0GCSqGSIb3DQEBCwUAA4IBAQDJGXuE27BnnpZ+GL7x0Yw3
+FetPKrMK22QHFat0hjxsSi+Y8Qgrh7i3nrIkB8vxz9uLTYiLnoGxFRYl02l8L3Bl
+m5UzFf7dHcWPgl11CRbR8QlUDst0Y7vci2tiiSUVv1txgBqn6jQ64h8nSver8IzK
+ZOuvbdbl4i2vKbnNWWE7yE3ZsZACsshqvhGtfVXO+yg7CCb1iLYFbN6fLDIuOXll
+BUnzi2WiklbimWCL25udybWLzUfAJKIXCqa16pmxjQ1IMMEWluXzLqkADA2Qi9BR
+y+wONYFnghD55ehIiWvkl0EonWllR8zaoir7zXbD+BCH/BLdD98ZCdA8tU1PPRym
+-----END CERTIFICATE-----'''
 
-    if request.method == 'POST' and form.validate_on_submit():
-        user = User.query.get(form.user.data)
-        safe = Safe.query.get(form.safe.data)
-        compartment.name = form.name.data
-        compartment.safe = safe
-        compartment.user = user
-        db.session.commit()
-         #  audit.auditlog_update_post('compartment', original_data=original_data, updated_data=compartment.to_dict(), record_name=compartment.name)
+    pem_cert = b'''-----BEGIN CERTIFICATE-----
+MIID8jCCAtqgAwIBAgIUX7iRH0iV9Blhg/nwLNxR2cYqDBMwDQYJKoZIhvcNAQEL
+BQAwLDELMAkGA1UEBhMCU0UxDzANBgNVBAoMBlRlc3RDQTEMMAoGA1UEAwwDYmJi
+MB4XDTIyMDUxOTAwMDAwMFoXDTIzMDUyMDAwMDAwMFowUjEQMA4GA1UEAwwHYmJi
+YmJiYjEQMA4GCgmSJomT8ixkAQEMADEJMAcGA1UEBRMAMQkwBwYDVQQLDAAxCTAH
+BgNVBAoMADELMAkGA1UEBhMCU0UwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
+AoIBAQDPTX4LJizhEDAqxeJrOVmtvQmr3LW4SGKxnFs/g9kxcCay8L9g3fkemjtN
+wF9pxllZtGpQOHDZ9IwefU93VI9GHL3V8nQfVQxXO8XC5qdmp+2yJVtjjHt5mfG3
+h44s5tJDinxFOaIaRn4sK2A+/OUD6nro26mBIdiiRB27Vaq8WCTtWFvS3WGf+hMC
+ycheLATP9XvplxVXeqMiUJDTyNBYsAd6l3SwY2kCZpqCyk8Ybt1JRw9S6Wuqn2v3
+2Pd2WU3Rps/ZhSt6ST7Q8h1hb/dxLQmA2VtWg9LjkpWj+BdcQauSAoelikFCLdG7
+xJrtD/SnYr+gyq16TJuIGlHeOIqLAgMBAAGjgeUwgeIwFAYDVR0RBA0wC4IAggdi
+YmJiYmJiMBYGA1UdJQEB/wQMMAoGCCsGAQUFBwMBMA4GA1UdDwEB/wQEAwIFoDAu
+BgNVHR8EJzAlMCOgIaAfhh1odHRwOi8vc2VydmVyLmNvbS9jcmwvYmJiLmNybDAy
+BggrBgEFBQcBAQQmMCQwIgYIKwYBBQUHMAGGFmh0dHA6Ly9zZXJ2ZXIuY29tL29j
+c3AwHwYDVR0jBBgwFoAU6F9s4wc3tloigVlR+lyvpClQoiowHQYDVR0OBBYEFFCP
+OjVIEN1Tdy+xF2O1ExgAzq/IMA0GCSqGSIb3DQEBCwUAA4IBAQAEI5/paU7d/GT8
+sJFTp+IPtkQEg925WnvmV/5u6fG+Ym2/KnHqjVAKAXFJoES+2XsjW+lMmru7nSMF
+dW6v7ySVg1yT+oerUgMJkWI5VW9bhqw62msKIsPUqCyWNfwmy/WWTjrCfhL/jK7x
+MgH9L317WcEFK+0I0X3d42tojtxro/Ms6dFwyZW2Ur5nmObB9CGdgTYga/jlLfGL
+FN0Fi22WxuYSD2Ua9go7Bn1XGm5+qtuDAQUHnl5WX3CZ32bMBKvLvfgvsIe53x0O
+yMEzX5FqzK3ndBB8AbRznj68sEpDQyCKLapuLG5smRa2vQIPimP0uLALruZ7hbiW
+XFMnY/cC
+-----END CERTIFICATE-----'''
 
-        flash(_('Your changes to the compartment have been saved.'))
+    cert = load_pem_x509_certificate(pem_cert)
+    issuer = load_pem_x509_certificate(pem_issuer)
+    responder_cert = load_pem_x509_certificate(responder.cert.encode('utf-8'))
+    responder_key = serialization.load_pem_private_key(responder.keys.key, responder.keys.password)
 
-        return redirect(url_for('main.index'))
+    builder = ocsp.OCSPResponseBuilder()
 
-    else:
-        form.user.data = compartment.user_id
-        form.safe.data = compartment.safe_id
-        if compartment.auditor_id is not None:
-            auditor = User.query.get(compartment.auditor_id)
-            form.auditor.data = auditor.username
-        else:
-            form.auditor.data = 'Not Audited'
+    builder = builder.add_response(
+        cert=cert,
+        issuer=issuer,
+        algorithm=hashes.SHA256(),
+        cert_status=ocsp.OCSPCertStatus.GOOD,
+        this_update=datetime.datetime.now(),
+        next_update=datetime.datetime.now(),
+        revocation_time=None,
+        revocation_reason=None
+    ).responder_id(
+        ocsp.OCSPResponderEncoding.HASH, responder_cert
+    )
+    builder = builder.certificates([responder_cert])
+    ocspnounce = ocsp_req.extensions.get_extension_for_class(x509.OCSPNonce)
+    builder = builder.add_extension(ocspnounce.value, critical=False)
 
-        return render_template('safe.html', title=_('Edit Compartment'),
-                               form=form)
+    response = builder.sign(responder_key, hashes.SHA256())
+#    response.certificate_status
 
-
-@bp.route('/compartment/list/', methods=['GET', 'POST'])
-@login_required
-def compartment_list():
-
-    page = request.args.get('page', 1, type=int)
-    sort = request.args.get('sort', 'name')
-    order = request.args.get('order', 'desc')
-
-    sortstr = "{}(Compartment.{})".format(order, sort)
-    compartments = Compartment.query.order_by(eval(sortstr)).paginate(
-        page, current_app.config['POSTS_PER_PAGE'], False)
-
-    next_url = url_for('main.compartment_list', page=compartments.next_num, sort=sort, order=order) \
-        if compartments.has_next else None
-    prev_url = url_for('main.compartment_list', page=compartments.prev_num, sort=sort, order=order) \
-        if compartments.has_prev else None
-
-    return render_template('safe.html', title=_('Compartment List'),
-                           compartments=compartments.items, next_url=next_url,
-                           prev_url=prev_url, order=order)
-
-
-@bp.route('/compartment/delete/', methods=['GET', 'POST'])
-@login_required
-def compartment_delete():
-
-    compartmentid = request.args.get('compartment')
-    compartment = Compartment.query.get(compartmentid)
-
-    if compartment is None:
-        flash(_('Compartment was not deleted, id not found!'))
-        return redirect(url_for('main.index'))
-
-    deleted_msg = 'Compartment deleted: %s' % (compartment.name)
-    db.session.delete(compartment)
-    db.session.commit()
-     #  audit.auditlog_delete_post('compartment', data=compartment.to_dict(), record_name=compartment.name)
-
-    flash(deleted_msg)
-
-    return redirect(url_for('main.index'))
-
-
-@bp.route('/compartment/audit/', methods=['GET', 'POST'])
-@login_required
-def compartment_audit():
-
-    compartmentid = request.args.get('compartment')
-
-    compartment = Compartment.query.get(compartmentid)
-    original_data = compartment.to_dict()
-
-    form = AuditCompartmentForm(obj=compartment)
-
-    if compartment is None:
-        flash(_('Compartment not found'))
-        return redirect(request.referrer)
-
-    if request.method == 'POST' and form.validate_on_submit():
-        auditor = User.query.filter_by(username=current_user.username).first_or_404()
-        if current_user.username == compartment.user.username:
-            flash(_('You are not allowed to audit your own compartment'))
-            return redirect(request.referrer)
-
-        if 'approved' in request.form:
-            compartment.audit_status = "approved"
-        elif 'failed' in request.form:
-            compartment.audit_status = "failed"
-        else:
-            flash(_('Unknown auditor status'))
-            return redirect(request.referrer)
-
-        compartment.audit_date = datetime.utcnow()
-        compartment.audit_comment = form.comment.data
-        compartment.auditor_id = auditor.id
-        db.session.commit()
-         #  audit.auditlog_update_post('compartment', original_data=original_data, updated_data=compartment.to_dict(), record_name=compartment.name)
-
-        flash(_('Your changes to the compartment have been saved.'))
-
-        return redirect(url_for('main.compartment_list'))
-
-    else:
-        if current_user.username == compartment.user.username:
-            flash(_('You are not allowed to audit your own compartment'))
-
-        form.user.data = compartment.user.username
-        form.safe.data = compartment.safe.name
-        hsmpeds = HsmPed.query.filter_by(compartment_id=compartment.id)
-        hsmpins = HsmPin.query.filter_by(compartment_id=compartment.id)
-
-        return render_template('safe.html', title=_('Audit Compartment'),
-                               hsmpeds=hsmpeds, hsmpins=hsmpins, form=form)
-
-
-@bp.route('/safe/qr/<int:id>', methods=['GET'])
-@login_required
-def safe_qr(id):
-
-    if id is None:
-        flash(_('safe was not found, id not found!'))
-        return redirect(url_for('main.index'))
-
-    safe=None
-    safe = Safe.query.get(id)
-
-    if safe is None:
-        flash(_('safe was not found, id not found!'))
-        return redirect(url_for('main.index'))
-
-    qr_data = url_for("main.safe_edit", safe=safe.id, _external=True)
-    return render_template('safe_qr.html', title=_('QR Code'),
-                           safe=safe, qr_data=qr_data)
-
-
-@bp.route('/compartment/qr/<int:id>', methods=['GET'])
-@login_required
-def compartment_qr(id):
-
-    if id is None:
-        flash(_('compartment was not found, id not found!'))
-        return redirect(url_for('main.index'))
-
-    compartment=None
-    compartment = Compartment.query.get(id)
-
-    if compartment is None:
-        flash(_('compartment was not found, id not found!'))
-        return redirect(url_for('main.index'))
-
-    qr_data = url_for("main.compartment_edit", compartment=compartment.id, _external=True)
-    return render_template('compartment_qr.html', title=_('QR Code'),
-                           compartment=compartment, qr_data=qr_data)
+    resp = make_response(response.public_bytes(serialization.Encoding.DER))
+    resp.mimetype = 'application/ocsp-response'
+    return resp

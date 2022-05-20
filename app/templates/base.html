@@ -59,6 +59,14 @@
 
          </ul>
      </li>
+     <li class="dropdown">
+         <a class="dropdown-toggle" data-toggle="dropdown" href="#">OCSP
+         <span class="caret"></span></a>
+         <ul class="dropdown-menu">
+           <li class="nav-item"><a href="{{ url_for('main.ocsp_list') }}">{{ _('List OCSP') }}</a></li>
+           <li class="nav-item"><a href="{{ url_for('main.ocsp_add') }}">{{ _('Add OCSP') }}</a></li>
+         </ul>
+     </li>
 
    {% endif %}
 

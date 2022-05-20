@@ -2,9 +2,9 @@
 FROM debian:latest
 
 # Set the working directory to /app
-WORKDIR /testca
+WORKDIR /haca
 
-COPY . /testca
+COPY . /haca
 
 # Install any needed packages
 RUN apt-get update
@@ -25,7 +25,7 @@ RUN rm -rf /var/lib/apt/lists/*
 # Make port available to the world outside this container
 EXPOSE 5000
 
-ENV FLASK_APP=/testca/testca.py
+ENV FLASK_APP=/haca/haca.py
 
 # Run flask when the container launches
-CMD [ "/testca/gunicorn-start.sh"]
+CMD [ "/haca/gunicorn-start.sh"]
