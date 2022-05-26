@@ -14,6 +14,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509 import ocsp
+from datetime import timedelta
+from cryptography.x509 import ReasonFlags
 
 
 @bp.route('/ocsp/add', methods=['GET', 'POST'])
@@ -178,18 +180,29 @@ def ocsp_query():
     responder_cert = load_pem_x509_certificate(responder.cert.encode('utf-8'))
     responder_key = serialization.load_pem_private_key(responder.keys.key, responder.keys.password)
 
-    print(f'cert name: {certobj.subject.rfc4514_string()} cert serial: {certobj.serial_number} issuer name: {issuer.subject.rfc4514_string()}')
     builder = ocsp.OCSPResponseBuilder()
+
+    ocspstatus = None
+    revocation_time = None
+    revocation_reason=None
+    if cert.status == "active":
+        ocspstatus = ocsp.OCSPCertStatus.GOOD
+    else:
+        ocspstatus = ocsp.OCSPCertStatus.REVOKED
+        revocation_reason = x509.ReasonFlags.unspecified
+        revocation_time = cert.revocation_time
+
+    print(f'cert name: {certobj.subject.rfc4514_string()} cert serial: {certobj.serial_number} issuer name: {issuer.subject.rfc4514_string()} status: {ocspstatus}')
 
     builder = builder.add_response(
         cert=certobj,
         issuer=issuer,
         algorithm=hashes.SHA256(),
-        cert_status=ocsp.OCSPCertStatus.GOOD,
+        cert_status=ocspstatus,
         this_update=datetime.datetime.now(),
-        next_update=datetime.datetime.now(),
-        revocation_time=None,
-        revocation_reason=None
+        next_update=datetime.datetime.now() + timedelta(seconds=600),
+        revocation_time=revocation_time,
+        revocation_reason=revocation_reason
     ).responder_id(
         ocsp.OCSPResponderEncoding.HASH, responder_cert
     )

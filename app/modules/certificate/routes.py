@@ -12,6 +12,7 @@ from flask_babel import _
 from app import db
 from cryptography.hazmat.primitives import serialization
 from cryptography import x509
+from datetime import datetime
 
 
 @bp.route('/cert/add', methods=['GET', 'POST'])
@@ -179,6 +180,25 @@ def cert_edit():
         form.ca.data = cert.ca_id
         return render_template('cert.html', title=_('Edit Certificate'),
                                form=form)
+
+
+@bp.route('/cert/revoke/<int:id>', methods=['GET', 'POST'])
+@login_required
+def cert_revoke(id):
+
+    cert = Certificate.query.get(id)
+#    original_data = cert.to_dict()
+
+    if cert is None:
+        render_template('cert.html', title=_('Certificate is not found'))
+
+    cert.status = "revoked"
+    cert.revocation_time = datetime.now()
+    db.session.commit()
+    # audit.auditlog_update_post('certificate', original_data=original_data, updated_data=cert.to_dict(), record_name=cert.name)
+    flash(_(f'Cert: {cert.name} serial: {cert.certserialnumber} have been revoked.'))
+
+    return render_template('cert.html', title=_('Certificate revoked'))
 
 
 @bp.route('/cert/list/', methods=['GET', 'POST'])

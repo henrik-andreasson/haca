@@ -74,6 +74,7 @@ class Certificate(db.Model):
     certserialnumber = db.Column(db.String(100))
     cert_obj = x509
     status = db.Column(db.String(140))
+    revocation_time = db.Column(db.DateTime)
     comment = db.Column(db.String(2000))
 
     def __repr__(self):
