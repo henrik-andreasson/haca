@@ -51,7 +51,7 @@ def format_public_key(public_key=None):
     public_key2 = public_key2.replace(' ', '')
     return public_key2
 
- 
+
 class Certificate(db.Model):
     __tablename__ = "certificate"
     __searchable__ = ['name', 'comment', 'status', 'serial']
@@ -71,6 +71,7 @@ class Certificate(db.Model):
     validity_start = db.Column(db.DateTime)
     validity_end = db.Column(db.DateTime)
     cert = db.Column(db.String(2000))
+    certserialnumber = db.Column(db.String(100))
     cert_obj = x509
     status = db.Column(db.String(140))
     comment = db.Column(db.String(2000))

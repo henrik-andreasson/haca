@@ -9,6 +9,7 @@ from flask_babel import _
 from sqlalchemy import desc, asc
 from app.modules.ca.models import CertificationAuthority
 from app.modules.keys.models import Keys
+from app.modules.certificate.models import Certificate
 from cryptography.hazmat.primitives import serialization
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -126,6 +127,9 @@ def ocsp_list():
 
 @bp.route('/ocsp/query/', methods=['GET', 'POST'])
 def ocsp_query():
+    import datetime
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.x509 import load_pem_x509_certificate
 
     length = int(request.headers['content-length'])
     if length > 10000:
@@ -133,79 +137,52 @@ def ocsp_query():
         return None
 
     data = request.get_data(cache=False, as_text=False, parse_form_data=False)
-    import pprint
-    pp = pprint.PrettyPrinter()
-    pp.pprint(data)
+    # import pprint
+    # pp = pprint.PrettyPrinter()
+    # pp.pprint(data)
     ocsp_req = ocsp.load_der_ocsp_request(data)
-    print(f'''
-ocsp req serial:  {ocsp_req.serial_number}
-issuer_key hash:  {ocsp_req.issuer_key_hash}
-issuer_name_hash: {ocsp_req.issuer_name_hash}
-hash_algorithm:   {ocsp_req.issuer_name_hash}
-''')
-    for e in ocsp_req.extensions:
-        print(f'extensions:       {e}')
+#     print(f'''
+# ocsp req serial:  {ocsp_req.serial_number}
+# issuer_key hash:  {ocsp_req.issuer_key_hash}
+# issuer_name_hash: {ocsp_req.issuer_name_hash}
+# hash_algorithm:   {ocsp_req.hash_algorithm}
+# ''')
+#     for e in ocsp_req.extensions:
+#         print(f'extensions:       {e}')
 
-    responder = Ocsp.query.order_by(Ocsp.validity_end).first()
-    # loop the cert and select the best
+    matched_ca = None
+    issuer = None
+    for ca in CertificationAuthority.query.order_by(CertificationAuthority.id).all():
+        curr_issuer = load_pem_x509_certificate(ca.certificate.cert.encode('utf-8'))
+        ca_issuer_key_hash = hashes.Hash(ocsp_req.hash_algorithm)
+        ca_issuer_key_hash.update(ca.certificate.cert.encode('utf-8'))
+        the_ca_key_hash = ca_issuer_key_hash.finalize()
+        issuer_name_hash = hashes.Hash(ocsp_req.hash_algorithm)
+        issuer_name_hash.update(curr_issuer.subject.public_bytes(serialization.Encoding.DER))
+        the_ca_name_hash = issuer_name_hash.finalize()
+        if ocsp_req.issuer_key_hash == the_ca_key_hash:
+            matched_ca = ca
+#            print(f'matched with issuer_key_hash: {ca_issuer_key_hash} ocsp: {ocsp_req.issuer_key_hash}')
+            issuer = curr_issuer
+        elif ocsp_req.issuer_name_hash == the_ca_name_hash:
+            matched_ca = ca
+            issuer = curr_issuer
+#            print(f'matched with issuer_key_hash: {the_ca_name_hash} ocsp: {ocsp_req.issuer_name_hash}')
+        else:
+            print(f'not matched with issuer_key_hash: {the_ca_name_hash} ocsp: {ocsp_req.issuer_name_hash}')
 
-    import datetime
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.x509 import load_pem_x509_certificate
+    responder = Ocsp.query.filter_by(ca_id=matched_ca.id).first()
 
-    pem_issuer = b'''-----BEGIN CERTIFICATE-----
-MIIC/DCCAeSgAwIBAgIUNhLv1R6WGrrAebORpBxc0hqW27cwDQYJKoZIhvcNAQEL
-BQAwLDELMAkGA1UEBhMCU0UxDzANBgNVBAoMBlRlc3RDQTEMMAoGA1UEAwwDYmJi
-MB4XDTIyMDUxOTAwMDAwMFoXDTMyMDUxOTAwMDAwMFowLDELMAkGA1UEBhMCU0Ux
-DzANBgNVBAoMBlRlc3RDQTEMMAoGA1UEAwwDYmJiMIIBIjANBgkqhkiG9w0BAQEF
-AAOCAQ8AMIIBCgKCAQEAysy7tW73d33//1Y8W9mQ7GOPGWg3B0ZS9UEDAdBrfQY2
-bOLcTZB3Luy3etRDl+0rESXq4D1EFJL9Sqf6lPsDXp5xbDj8D4fOxzsUP26C7FSQ
-i/RDTdcd9TruQbnUIwXiERQZOBpMAvugbbGJYdoA0vrMRKT1jUeyemLHpy17/JXc
-0DCKWQqfGRPz57zaTEtVo77ZZk6x/KmAEgxzrpESmUCohgUvtwmGQQ/d7OPNfVdK
-V+uAQrWemEv5LPmXBixE7lkGqgfpTAsHexy019Hrb6prY6GyiKgsbYAORkdQ6IbG
-a0XmbyPbdOrsrugS/yKrQ6mpAAZdVLKb4E+XDQFpIQIDAQABoxYwFDASBgNVHRMB
-Af8ECDAGAQH/AgEAMA0GCSqGSIb3DQEBCwUAA4IBAQDJGXuE27BnnpZ+GL7x0Yw3
-FetPKrMK22QHFat0hjxsSi+Y8Qgrh7i3nrIkB8vxz9uLTYiLnoGxFRYl02l8L3Bl
-m5UzFf7dHcWPgl11CRbR8QlUDst0Y7vci2tiiSUVv1txgBqn6jQ64h8nSver8IzK
-ZOuvbdbl4i2vKbnNWWE7yE3ZsZACsshqvhGtfVXO+yg7CCb1iLYFbN6fLDIuOXll
-BUnzi2WiklbimWCL25udybWLzUfAJKIXCqa16pmxjQ1IMMEWluXzLqkADA2Qi9BR
-y+wONYFnghD55ehIiWvkl0EonWllR8zaoir7zXbD+BCH/BLdD98ZCdA8tU1PPRym
------END CERTIFICATE-----'''
-
-    pem_cert = b'''-----BEGIN CERTIFICATE-----
-MIID8jCCAtqgAwIBAgIUX7iRH0iV9Blhg/nwLNxR2cYqDBMwDQYJKoZIhvcNAQEL
-BQAwLDELMAkGA1UEBhMCU0UxDzANBgNVBAoMBlRlc3RDQTEMMAoGA1UEAwwDYmJi
-MB4XDTIyMDUxOTAwMDAwMFoXDTIzMDUyMDAwMDAwMFowUjEQMA4GA1UEAwwHYmJi
-YmJiYjEQMA4GCgmSJomT8ixkAQEMADEJMAcGA1UEBRMAMQkwBwYDVQQLDAAxCTAH
-BgNVBAoMADELMAkGA1UEBhMCU0UwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
-AoIBAQDPTX4LJizhEDAqxeJrOVmtvQmr3LW4SGKxnFs/g9kxcCay8L9g3fkemjtN
-wF9pxllZtGpQOHDZ9IwefU93VI9GHL3V8nQfVQxXO8XC5qdmp+2yJVtjjHt5mfG3
-h44s5tJDinxFOaIaRn4sK2A+/OUD6nro26mBIdiiRB27Vaq8WCTtWFvS3WGf+hMC
-ycheLATP9XvplxVXeqMiUJDTyNBYsAd6l3SwY2kCZpqCyk8Ybt1JRw9S6Wuqn2v3
-2Pd2WU3Rps/ZhSt6ST7Q8h1hb/dxLQmA2VtWg9LjkpWj+BdcQauSAoelikFCLdG7
-xJrtD/SnYr+gyq16TJuIGlHeOIqLAgMBAAGjgeUwgeIwFAYDVR0RBA0wC4IAggdi
-YmJiYmJiMBYGA1UdJQEB/wQMMAoGCCsGAQUFBwMBMA4GA1UdDwEB/wQEAwIFoDAu
-BgNVHR8EJzAlMCOgIaAfhh1odHRwOi8vc2VydmVyLmNvbS9jcmwvYmJiLmNybDAy
-BggrBgEFBQcBAQQmMCQwIgYIKwYBBQUHMAGGFmh0dHA6Ly9zZXJ2ZXIuY29tL29j
-c3AwHwYDVR0jBBgwFoAU6F9s4wc3tloigVlR+lyvpClQoiowHQYDVR0OBBYEFFCP
-OjVIEN1Tdy+xF2O1ExgAzq/IMA0GCSqGSIb3DQEBCwUAA4IBAQAEI5/paU7d/GT8
-sJFTp+IPtkQEg925WnvmV/5u6fG+Ym2/KnHqjVAKAXFJoES+2XsjW+lMmru7nSMF
-dW6v7ySVg1yT+oerUgMJkWI5VW9bhqw62msKIsPUqCyWNfwmy/WWTjrCfhL/jK7x
-MgH9L317WcEFK+0I0X3d42tojtxro/Ms6dFwyZW2Ur5nmObB9CGdgTYga/jlLfGL
-FN0Fi22WxuYSD2Ua9go7Bn1XGm5+qtuDAQUHnl5WX3CZ32bMBKvLvfgvsIe53x0O
-yMEzX5FqzK3ndBB8AbRznj68sEpDQyCKLapuLG5smRa2vQIPimP0uLALruZ7hbiW
-XFMnY/cC
------END CERTIFICATE-----'''
-
-    cert = load_pem_x509_certificate(pem_cert)
-    issuer = load_pem_x509_certificate(pem_issuer)
+    cert = Certificate.query.filter_by(certserialnumber=str(ocsp_req.serial_number)).first()
+    certobj = load_pem_x509_certificate(cert.cert.encode('utf-8'))
     responder_cert = load_pem_x509_certificate(responder.cert.encode('utf-8'))
     responder_key = serialization.load_pem_private_key(responder.keys.key, responder.keys.password)
 
+    print(f'cert name: {certobj.subject.rfc4514_string()} cert serial: {certobj.serial_number} issuer name: {issuer.subject.rfc4514_string()}')
     builder = ocsp.OCSPResponseBuilder()
 
     builder = builder.add_response(
-        cert=cert,
+        cert=certobj,
         issuer=issuer,
         algorithm=hashes.SHA256(),
         cert_status=ocsp.OCSPCertStatus.GOOD,

@@ -80,6 +80,7 @@ def cert_add():
 #        txtcert = txtcert.replace('-----BEGIN CERTIFICATE-----', '')
 #        txtcert = txtcert.replace('-----END CERTIFICATE-----', '')
         certlist = pemcert.split('\n')
+        cert.certserialnumber = str(signed.serial_number)
         cert.cert = pemcert
         db.session.add(cert)
         db.session.commit()
