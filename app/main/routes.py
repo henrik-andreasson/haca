@@ -5,6 +5,8 @@ from app import db
 from app.main.forms import EditProfileForm, ServiceForm, SearchForm
 from app.main.models import User, Service, Audit
 from app.modules.certificate.models import Certificate
+from app.modules.ca.models import CertificationAuthority
+from app.modules.crl.models import Crl
 # from app.modules.approval.models import Approval
 from app.main import bp
 from datetime import datetime
@@ -25,10 +27,13 @@ def index():
     users = User.query.order_by(User.username).limit(10)
     services = Service.query.order_by(Service.name).limit(10)
     certificates = Certificate.query.order_by(Certificate.name).limit(10)
+    cas = CertificationAuthority.query.order_by(CertificationAuthority.name).limit(10)
+    crls = Crl.query.order_by(Crl.id).limit(10)
 
     return render_template('index.html', title=_('Explore'),
                            services=services, users=users,
-                           certificates=certificates)
+                           certificates=certificates,
+                           crls=crls, cas=cas)
 
 
 @bp.route('/search', methods=['GET', 'POST'])

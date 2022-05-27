@@ -12,7 +12,7 @@ import os
 from sqlalchemy.ext.declarative import declarative_base
 import uuid
 from flask_login import current_user
-from app.rocketchat import InventorpyRocketChatClient
+from app.rocketchat import HACARocketChatClient
 
 
 Base = declarative_base()
@@ -128,13 +128,13 @@ class User(PaginatedAPIMixin, UserMixin, db.Model):
     def get_reset_password_token(self, expires_in=600):
         return jwt.encode(
             {'reset_password': self.id, 'exp': time() + expires_in},
-            current_app.config['INVENTORPY_SECRET_KEY'],
+            current_app.config['HACA_SECRET_KEY'],
             algorithm='HS256').decode('utf-8')
 
     @staticmethod
     def verify_reset_password_token(token):
         try:
-            id = jwt.decode(token, current_app.config['INVENTORPY_SECRET_KEY'],
+            id = jwt.decode(token, current_app.config['HACA_SECRET_KEY'],
                             algorithms=['HS256'])['reset_password']
         except:
             return
@@ -299,7 +299,7 @@ class Audit(PaginatedAPIMixin, db.Model):
                       type='new', user=user)
         db.session.add(audit)
         db.session.commit()
-        rocket = InventorpyRocketChatClient()
+        rocket = HACARocketChatClient()
         rs = "{} added {} a {} with data {}".format(
             user.username, record_name, module, self.dict_to_string(original_data))
         rocket.send_message_to_rocket_chat(rs)
@@ -322,7 +322,7 @@ class Audit(PaginatedAPIMixin, db.Model):
                               type='update', user=user)
                 db.session.add(audit)
                 db.session.commit()
-                rocket = InventorpyRocketChatClient()
+                rocket = HACARocketChatClient()
                 rs = "{} changed {} a {} field: {} from: {} to: {}".format(
                     user.username, record_name, module, field, original_data[field], updated_data[field])
                 rocket.send_message_to_rocket_chat(rs)
@@ -344,3 +344,21 @@ class Audit(PaginatedAPIMixin, db.Model):
 
     def inventory_id(self):
         return '{}-{}'.format(self.__class__.__name__.lower(), self.id)
+
+
+def log(json_log):
+    # log_row = {
+    #     'cert name': certobj.subject.rfc4514_string(),
+    #     'cert serial': certobj.serial_number,
+    #     'issuer name': issuer.subject.rfc4514_string(),
+    #     'status': str(ocspstatus),
+    #     'delta_t (ms)': delta_t_ms_str
+    #     }
+    from json import dumps
+    print(dumps(json_log))
+
+    if 'title' in json_log:
+        print(f'{json_log["title"]}')
+        del json_log['title']
+    for key in json_log.keys():
+        print(f'   {key}: {json_log[key]}')

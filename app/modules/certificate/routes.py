@@ -13,6 +13,7 @@ from app import db
 from cryptography.hazmat.primitives import serialization
 from cryptography import x509
 from datetime import datetime
+from cryptography.x509 import load_pem_x509_certificate
 
 
 @bp.route('/cert/add', methods=['GET', 'POST'])
@@ -100,6 +101,26 @@ def cert_add():
 
         return render_template('cert.html', title=_('Add Certificate'),
                                form=form)
+
+
+@bp.route('/cert/view/<int:id>', methods=['GET', 'POST'])
+@login_required
+def cert_view(id):
+
+    cert = Certificate.query.get(id)
+
+    if cert is None:
+        render_template('cert.html', title=_('Certificate is not found'))
+
+    pemcert = cert.cert
+    certobj = load_pem_x509_certificate(pemcert.encode('utf-8'))
+    cert.cert_obj = certobj
+    parse_cert = cert.parse_cert()
+
+    return render_template('cert.html', title=_('Certificate created'),
+                           cert=cert, htmlcert=pemcert,
+                           parse_cert=parse_cert
+                           )
 
 
 @bp.route('/cert/csr', methods=['GET', 'POST'])

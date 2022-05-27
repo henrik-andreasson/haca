@@ -1,5 +1,5 @@
 from flask import render_template, flash, redirect, url_for, request, \
-  current_app, make_response
+  current_app, make_response, jsonify
 from flask_login import login_required
 from app import db
 from app.main import bp
@@ -14,8 +14,9 @@ from cryptography.hazmat.primitives import serialization
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509 import ocsp
-from datetime import timedelta
+from datetime import datetime, timedelta
 from cryptography.x509 import ReasonFlags
+from json import dumps
 
 
 @bp.route('/ocsp/add', methods=['GET', 'POST'])
@@ -129,7 +130,7 @@ def ocsp_list():
 
 @bp.route('/ocsp/query/', methods=['GET', 'POST'])
 def ocsp_query():
-    import datetime
+    start_query = datetime.now()
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.x509 import load_pem_x509_certificate
 
@@ -192,15 +193,14 @@ def ocsp_query():
         revocation_reason = x509.ReasonFlags.unspecified
         revocation_time = cert.revocation_time
 
-    print(f'cert name: {certobj.subject.rfc4514_string()} cert serial: {certobj.serial_number} issuer name: {issuer.subject.rfc4514_string()} status: {ocspstatus}')
 
     builder = builder.add_response(
         cert=certobj,
         issuer=issuer,
         algorithm=hashes.SHA256(),
         cert_status=ocspstatus,
-        this_update=datetime.datetime.now(),
-        next_update=datetime.datetime.now() + timedelta(seconds=600),
+        this_update=datetime.now(),
+        next_update=datetime.now() + timedelta(seconds=600),
         revocation_time=revocation_time,
         revocation_reason=revocation_reason
     ).responder_id(
@@ -215,4 +215,27 @@ def ocsp_query():
 
     resp = make_response(response.public_bytes(serialization.Encoding.DER))
     resp.mimetype = 'application/ocsp-response'
+
+    finish_query = datetime.now()
+    delta_t = finish_query - start_query
+    delta_t_ms_str = round(delta_t.total_seconds() * 1000)
+    from app.main.models import log
+    log_row = {
+        'title': 'ocsp reponse',
+        'cert name': certobj.subject.rfc4514_string(),
+        'cert serial': certobj.serial_number,
+        'issuer name': issuer.subject.rfc4514_string(),
+        'status': str(ocspstatus),
+        'delta_t (ms)': delta_t_ms_str
+        }
+    log(log_row)
+    # print(dumps(log_row))
+    # print(f'''ocsp response
+    # issuer name: {issuer.subject.rfc4514_string()}
+    # cert name: {certobj.subject.rfc4514_string()}
+    # cert serial: {certobj.serial_number}
+    # status: str({ocspstatus})
+    # delta_t (ms): {delta_t_ms_str}
+    # ''')
+
     return resp

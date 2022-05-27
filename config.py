@@ -5,7 +5,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 
 class Config(object):
-    SECRET_KEY = os.environ.get('INVENTORPY_SECRET_KEY') or 'you-will-never-guess'
+    SECRET_KEY = os.environ.get('HACA_SECRET_KEY') or 'you-will-never-guess'
     PREFERRED_URL_SCHEME = os.environ.get('PREFERRED_URL_SCHEME') or 'http'
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'sqlite:///' + os.path.join(basedir, 'ca.db')
@@ -26,7 +26,7 @@ class Config(object):
     ROCKET_URL = os.environ.get('ROCKET_URL') or 'http://172.17.0.4:3000'
     ROCKET_CHANNEL = os.environ.get('ROCKET_CHANNEL') or 'general'
     OPEN_REGISTRATION = os.environ.get('OPEN_REGISTRATION') or True
-    INVENTORPY_TZ = os.environ.get('TEAMPLAN_TZ') or "Europe/Stockholm"
+    HACA_TZ = os.environ.get('TEAMPLAN_TZ') or "Europe/Stockholm"
     CERT_LOGIN = os.environ.get('CERT_LOGIN') or False
     CERT_DN_COMP_IS_USERNAME = os.environ.get('CERT_DN_COMP_IS_USERNAME') or "CN"
     PROXY_FIX = os.environ.get('PROXY_FIX') or 0

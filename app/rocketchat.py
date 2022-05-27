@@ -2,7 +2,7 @@ from flask import current_app
 from rocketchat_API.rocketchat import RocketChat
 
 
-class InventorpyRocketChatClient(object):
+class HACARocketChatClient(object):
 
     def send_message_to_rocket_chat(self, message, channel=None):
 
