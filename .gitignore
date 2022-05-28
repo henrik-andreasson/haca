@@ -6,6 +6,10 @@ msearch/*
 cert-*
 logs/*log*
 ca-*
+utils/*crt
+utils/*ca
+utils/*key
+utils/.token
 
 # C extensions
 *.so
