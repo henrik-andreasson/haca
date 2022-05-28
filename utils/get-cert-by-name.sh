@@ -22,36 +22,13 @@ fi
 
 
 if [ "x$1" != "x" ] ; then
-    csvfile=$1
+    name=$1
 else
-    echo "arg1 must be a file with cert definitions in it"
-    echo "name,userid,serial,orgunit,org,country,profile,sandns,service_name,ca_name"
+    echo "name must be arg1"
     exit
 fi
 
-IFS=$'\n'
-for row in $(cat "${csvfile}") ; do
 
-  name=$(echo $row | cut -f1 -d\,)
-  userid=$(echo $row | cut -f2 -d\,)
-  serial=$(echo $row | cut -f3 -d\,)
-  orgunit=$(echo $row | cut -f4 -d\,)
-  org=$(echo $row     | cut -f5 -d\,)
-  country=$(echo $row | cut -f6 -d\,)
-  profile=$(echo $row | cut -f7 -d\,)
-  sandns=$(echo $row | cut -f8 -d\,)
-  service_name=$(echo $row | cut -f9 -d\,)
-  ca_name=$(echo $row | cut -f10 -d\,)
-  status=$(echo $row | cut -f11 -d\,)
-  validity_start=$(echo $row | cut -f12 -d\,)
-  validity_end=$(echo $row | cut -f13 -d\,)
-
-  iscomment=$(echo $row | grep "^#" )
-  if [ "x$iscomment" != "x" ] ; then
-    continue
-  fi
-  result=$(http --verify cacerts.pem "${API_URL}/cert/${name}" \
+result=$(http --verify cacerts.pem "${API_URL}/cert/${name}" \
     "Authorization:Bearer $token")
-  echo $result
-  #| jq .
-done
+  echo $result | jq .

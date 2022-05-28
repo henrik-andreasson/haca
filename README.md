@@ -12,6 +12,12 @@ Heavily based on the excellent tutorial  [Flask Mega Tutorial](https://blog.migu
 
 Big Thanks to Miguel!
 
+# quick intro
+
+
+![intro webgui](docs/haca-webgui.gif)
+
+![intro cli](docs/haca-cli.gif)
 
 # Running
 

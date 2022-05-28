@@ -74,7 +74,7 @@ def ocsp_add():
     if ca is None:
         ca = CertificationAuthority.query.get(data['ca'])
     if ca is None:
-        return bad_request('must include ca_name or ca_id in fields')
+        return bad_request('must include name or id in the ca field')
     else:
         ocsp_responder.ca = ca
 
