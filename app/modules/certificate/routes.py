@@ -245,7 +245,7 @@ def cert_list():
 
     next_url = url_for('main.cert_list', page=certs.next_num) \
         if certs.has_next else None
-    prev_url = url_for('main.certs_list', page=certs.prev_num) \
+    prev_url = url_for('main.cert_list', page=certs.prev_num) \
         if certs.has_prev else None
 
     return render_template('cert.html', title=_('Certificate'),

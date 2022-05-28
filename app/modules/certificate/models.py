@@ -4,6 +4,7 @@ from cryptography import x509
 import binascii
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
+from app.main.models import PaginatedAPIMixin
 
 
 def format_signature(signature=None):
@@ -52,7 +53,7 @@ def format_public_key(public_key=None):
     return public_key2
 
 
-class Certificate(db.Model):
+class Certificate(PaginatedAPIMixin, db.Model):
     __tablename__ = "certificate"
     __searchable__ = ['name', 'comment', 'status', 'serial']
 
@@ -87,7 +88,7 @@ class Certificate(db.Model):
         data = {
             'id': self.id,
             'name': self.name,
-            'serial': self.cert_obj.serialnumber,
+            'serial': self.certserialnumber,
             'service_id': self.service_id,
             'status': self.status,
             'validity_start': self.validity_start,
@@ -135,7 +136,7 @@ class Certificate(db.Model):
             'not_valid_before': self.cert_obj.not_valid_before,
             'not_valid_after': self.cert_obj.not_valid_after,
             'signature_hash_algorithm': self.cert_obj.signature_hash_algorithm.name,
-            'version': self.cert_obj.version,
+            'version': str(self.cert_obj.version),
             'fingerprint':  binascii.hexlify(self.cert_obj.fingerprint(hashes.SHA256())).decode(),
             'public_key': format_public_key(self.cert_obj.public_key()),
             'public_key_openssh': self.cert_obj.public_key().public_bytes(serialization.Encoding.OpenSSH, serialization.PublicFormat.OpenSSH).decode(),

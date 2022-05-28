@@ -1,158 +1,139 @@
 from app.api import bp
 from flask import jsonify
-from app.modules.firewall.models import Firewall, FirewallPort
-from app.modules.rack.models import Rack
-from app.modules.network.models import Network
-from app.modules.server.models import Server
-from app.main.models import Service, Location
+from app.modules.certificate.models import Certificate
+from app.main.models import Service
 from flask import url_for
 from app import db
 from app.api.errors import bad_request
 from flask import request
 from app.api.auth import token_auth
+from app.modules.keys.models import Keys
+from app.modules.ca.models import CertificationAuthority
+from cryptography.hazmat.primitives import serialization
+from datetime import datetime
 
 
-@bp.route('/firewall/add', methods=['POST'])
+@bp.route('/cert/generate', methods=['POST'])
 @token_auth.login_required
-def create_firewall():
+def create_cert():
     data = request.get_json() or {}
-    for field in ['name', 'status']:
+    for field in ['name', 'status', 'validity_start', 'validity_end']:
         if field not in data:
             return bad_request('must include %s fields' % field)
 
-    check_firewall = Firewall.query.filter_by(name=data['name']).first()
-    if check_firewall is not None:
-        return bad_request('Firewall already exist with id: %s' % check_firewall.id)
+    cert = Certificate(status=data['status'],
+                       validity_start=datetime.strptime(data['validity_start'], "%Y-%m-%d"),
+                       validity_end=datetime.strptime(data['validity_end'], "%Y-%m-%d")
+                       )
+    certname_set = False
+    if 'name' in data:
+        cert.name = data['name']
+        certname_set = True
+    if 'userid' in data:
+        cert.userid = data['userid']
+        certname_set = True
+    if 'serial' in data:
+        cert.serial = data['serial']
+        certname_set = True
+    if 'orgunit' in data:
+        cert.orgunit = data['orgunit']
+        certname_set = True
+    if 'org' in data:
+        cert.org = data['org']
+        certname_set = True
+    if 'country' in data:
+        cert.country = data['country']
+        certname_set = True
+    if 'profile' in data:
+        cert.profile = "server"
+    else:
+        cert.profile = data['profile']
 
-    firewall = Firewall()
-    firewall.from_dict(data)
+    if 'sandns' in data:
+        cert.sandns = data['sandns']
 
-    db.session.add(firewall)
+    if certname_set is False:
+        return bad_request('must include some name fields')
+
+    service = None
+    if 'service_name' in data:
+        service = Service.query.filter_by(name=data['service_name']).first()
+    elif 'service_id' in data:
+        service = Service.query.get(data['service_id'])
+
+    if service is None:
+        return bad_request('must include service_name or service_id in fields')
+
+    cert.service = service
+
+    ca = None
+    if 'ca_name' in data:
+        ca = CertificationAuthority.query.filter_by(name=data['ca_name']).first()
+    elif 'ca_id' in data:
+        ca = CertificationAuthority.query.get(data['ca_id'])
+
+    if ca is None:
+        return bad_request('must include ca_name or ca_id in fields')
+
+    cert.ca = ca
+    keys = Keys()
+    signed = ca.create_cert(cert, b"foo123", b"foo123", keys)
+    pemcert = signed.public_bytes(serialization.Encoding.PEM).decode()
+    pemcacert = cert.ca.certificate.cert
+
+    cert.certserialnumber = str(signed.serial_number)
+    cert.cert = pemcert
+    db.session.add(cert)
     db.session.commit()
-    #  audit.auditlog_new_post('firewall', original_data=firewall.to_dict(), record_name=firewall.name)
+    # audit.auditlog_new_post('cert', original_data=cert.to_dict(), record_name=cert.name)
+    response_info = cert.parse_cert()
+    response_info['pemkey'] = keys.keys.decode()
+    response_info['pemcert'] = pemcert
+    response_info['pemcacert'] = pemcacert
 
-    response = jsonify(firewall.to_dict())
+    response = jsonify(response_info)
 
-    response.status_code = 201
-    response.headers['Location'] = url_for('api.get_firewall', id=firewall.id)
-    return response
-
-
-@bp.route('/firewall/<name>', methods=['GET'])
-@token_auth.login_required
-def get_firewall_by_name(name):
-
-    check_firewall = Firewall.query.filter_by(name=name).first()
-    if check_firewall is None:
-        return bad_request('Firewall with name %s dont exist' % name)
-
-    response = jsonify(check_firewall.to_dict())
     response.status_code = 201
     return response
 
 
-@bp.route('/firewalllist', methods=['GET'])
+@bp.route('/cert/<name>', methods=['GET'])
 @token_auth.login_required
-def get_firewalllist():
+def get_cert_by_name(name):
+
+    cert = Certificate.query.filter_by(name=name).first()
+    if cert is None:
+        return bad_request('Certificate with name %s dont exist' % name)
+
+    response = jsonify(cert.to_dict())
+    response.status_code = 201
+    return response
+
+
+@bp.route('/cert/list', methods=['GET'])
+@token_auth.login_required
+def get_cert_list():
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 10, type=int), 100)
-    data = Firewall.to_collection_dict(Firewall.query, page, per_page, 'api.get_firewall')
+    data = Certificate.to_collection_dict(Certificate.query, page, per_page, 'api.get_cert_list')
     return jsonify(data)
 
 
-@bp.route('/firewall/<int:id>', methods=['GET'])
+@bp.route('/cert/<int:id>', methods=['GET'])
 @token_auth.login_required
-def get_firewall(id):
-    return jsonify(Firewall.query.get_or_404(id).to_dict())
+def get_cert(id):
+    return jsonify(Certificate.query.get_or_404(id).to_dict())
 
 
-@bp.route('/firewall/<int:id>', methods=['PUT'])
+@bp.route('/cert/<int:id>', methods=['PUT'])
 @token_auth.login_required
-def update_firewall(id):
-    firewall = Firewall.query.get_or_404(id)
-    original_data = firewall.to_dict()
+def update_cert(id):
+    cert = Certificate.query.get_or_404(id)
+    original_data = cert.to_dict()
 
     data = request.get_json() or {}
-    firewall.from_dict(data, new_firewall=False)
+    cert.from_dict(data, new_firewall=False)
     db.session.commit()
     #  audit.auditlog_update_post('firewall', original_data=original_data, updated_data=firewall.to_dict(), record_name=firewall.hostname)
 
-    return jsonify(firewall.to_dict())
-
-
-@bp.route('/firewall/port/add', methods=['POST'])
-@token_auth.login_required
-def firewall_port_add():
-    data = request.get_json() or {}
-    for field in ['name', 'firewall']:
-        if field not in data:
-            return bad_request('must include %s fields' % field)
-
-    firewall = Firewall.query.filter_by(name=data['firewall']).first()
-    if firewall is None:
-        return bad_request('No such Firewall name exist in the db')
-    else:
-        print("adding port to firewall: {} {}".format(firewall.name, firewall.id))
-
-    check_sp = FirewallPort.query.filter_by(name=data['name'], firewall_id=firewall.id).first()
-    if check_sp is not None:
-        return bad_request('FirewallPort already exist with id: %s' % check_sp.id)
-    else:
-        print("the port {} was not found, adding".format(data['name']))
-
-    network = None
-    server = None
-    if 'network_id' in data:
-        network = Network.query.get(data['network_id'])
-    elif 'network_name' in data:
-        network = Network.query.filter_by(name=data['network_name']).first()
-
-    if 'server_id' in data:
-        server = server.query.get(data['rack_id'])
-    elif 'server_name' in data:
-        server = Server.query.filter_by(name=data['rack_name'])
-
-    firewall_port = FirewallPort()
-    firewall_port.from_dict(data)
-    firewall_port.firewall = firewall
-    firewall_port.network = network
-    firewall_port.server = server
-
-    db.session.add(firewall_port)
-    db.session.commit()
-    #  audit.auditlog_new_post('firewall', original_data=firewall_port.to_dict(), record_name=firewall_port.name)
-
-    response = jsonify(firewall_port.to_dict())
-
-    response.status_code = 201
-    response.headers['Location'] = url_for('api.get_firewall_port', id=firewall_port.id)
-    return response
-
-
-@bp.route('/firewall/port/list', methods=['GET'])
-@token_auth.login_required
-def get_firewall_port_list():
-    page = request.args.get('page', 1, type=int)
-    per_page = min(request.args.get('per_page', 10, type=int), 100)
-    data = FirewallPort.to_collection_dict(FirewallPort.query, page, per_page, 'api.get_firewall_port')
-    return jsonify(data)
-
-
-@bp.route('/firewall/port/<int:id>', methods=['GET'])
-@token_auth.login_required
-def get_firewall_port(id):
-    return jsonify(FirewallPort.query.get_or_404(id).to_dict())
-
-
-@bp.route('/firewall/port/<int:id>', methods=['PUT'])
-@token_auth.login_required
-def update_firewall_port(id):
-    firewall_port = FirewallPort.query.get_or_404(id)
-    original_data = firewall_port.to_dict()
-
-    data = request.get_json() or {}
-    firewall_port.from_dict(data, new_firewall=False)
-    db.session.commit()
-    #  audit.auditlog_update_post('firewall', original_data=original_data, updated_data=firewall_port.to_dict(), record_name=firewall_port.name)
-
-    return jsonify(firewall_port.to_dict())
+    return jsonify(cert.to_dict())

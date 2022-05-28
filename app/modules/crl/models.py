@@ -2,9 +2,10 @@ from app import db
 from cryptography import x509
 from cryptography.x509 import CertificateRevocationList
 from cryptography.hazmat.primitives import serialization
+from app.main.models import PaginatedAPIMixin
 
 
-class Crl(db.Model):
+class Crl(PaginatedAPIMixin, db.Model):
     __tablename__ = "crl"
     __searchable__ = []
     id = db.Column(db.Integer, primary_key=True)
@@ -22,7 +23,9 @@ class Crl(db.Model):
         data = {
             'id': self.id,
             'ca_id': self.ca_id,
-            'crl': self.crl.public_bytes(serialization.Encoding.PEM)
+            'validity_start': self.validity_start,
+            'validity_end': self.validity_end,
+            'crl': self.pem
             }
         return data
 

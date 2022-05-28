@@ -1,85 +1,89 @@
 from app.api import bp
 from flask import jsonify
-from app.modules.rack.models import Rack
+from app.modules.crl.models import Crl
 from flask import url_for
 from app import db
 from app.api.errors import bad_request
 from flask import request
 from app.api.auth import token_auth
+from app.modules.ca.models import CertificationAuthority
+from datetime import datetime, timedelta
+from cryptography.hazmat.primitives import serialization
 
 
-@bp.route('/rack', methods=['POST'])
+@bp.route('/crl', methods=['POST'])
 @token_auth.login_required
-def create_rack():
+def create_crl():
     data = request.get_json() or {}
 
-    if 'name' not in data:
-        return bad_request('Name field is mandatory')
+    ca = None
+    if 'ca_name' in data:
+        ca = CertificationAuthority.query.filter_by(name=data['ca_name']).first()
+    elif 'ca_id' in data:
+        ca = CertificationAuthority.query.get(data['ca_id'])
 
-    check_rack = Rack.query.filter_by(name=data['name']).first()
-    if check_rack is not None:
-        return bad_request('Rack already exist with id: %s' % check_rack.id)
+    if ca is None:
+        return bad_request('must include ca_name or ca_id in fields')
 
-    rack = Rack()
-    status = rack.from_dict(data)
-    if status['success'] is False:
-        return bad_request(status['msg'])
+    validity_start = datetime.now()
+    if 'validity_start' in data:
+        validity_start = data['validity_start']
 
-    db.session.add(rack)
+    validity_end = datetime.now() + timedelta(hours=24)
+    if 'validity_end' in data:
+        validity_end = data['validity_end']
+
+    crl = Crl(validity_start=validity_start,
+              validity_end=validity_end)
+
+    crl_obj = ca.create_crl(crl, b"foo123")
+
+    pemcrl = crl_obj.public_bytes(serialization.Encoding.PEM).decode('utf-8')
+    crl.pem = pemcrl
+    crl.ca = ca
+
+    db.session.add(crl)
     db.session.commit()
-     #  audit.auditlog_new_post('rack', original_data=rack.to_dict(), record_name=rack.name)
+     #  audit.auditlog_new_post('crl', original_data=crl.to_dict(), record_name=crl.name)
 
-    response = jsonify(rack.to_dict())
+    response = jsonify(crl.to_dict())
 
     response.status_code = 201
-    response.headers['Rack'] = url_for('api.get_rack', id=rack.id)
+    response.headers['Crl'] = url_for('api.get_crl', id=crl.id)
     return response
 
 
-@bp.route('/rack/<name>', methods=['GET'])
+@bp.route('/crl/<ca_name>', methods=['GET'])
 @token_auth.login_required
-def get_rack_by_name(name):
+def get_crl_by_name(ca_name):
 
-    if name is None:
-        return bad_request('Name field is mandatory')
+    ca = None
+    if ca_name is not None:
+        ca = CertificationAuthority.query.filter_by(name=ca_name).first()
 
-    check_rack = Rack.query.filter_by(name=name).first()
-    if check_rack is None:
-        return bad_request('Rack dont exist name: %s' % name)
+    if ca is None:
+        return bad_request('must include ca_name or ca_id in fields')
 
-    response = jsonify(check_rack.to_dict())
+    crl = Crl.query.filter_by(ca_id=ca.id).first()
+    if crl is None:
+        return bad_request('Crl dont exist name: %s' % ca_name)
+
+    response = jsonify(crl.to_dict())
     response.status_code = 201
 
     return response
 
 
-@bp.route('/racklist', methods=['GET'])
+@bp.route('/crl/list', methods=['GET'])
 @token_auth.login_required
-def get_racklist():
-
-    racks = Rack.query.all()
-
-    data = {
-        'items': [(item.id,) for item in racks],
-    }
+def get_crllist():
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 10, type=int), 100)
+    data = Crl.to_collection_dict(Crl.query.order_by(Crl.validity_end), page, per_page, 'api.get_cert_list')
     return jsonify(data)
 
 
-@bp.route('/rack/<int:id>', methods=['GET'])
+@bp.route('/crl/<int:id>', methods=['GET'])
 @token_auth.login_required
-def get_rack(id):
-    return jsonify(Rack.query.get_or_404(id).to_dict())
-
-
-@bp.route('/rack/<int:id>', methods=['PUT'])
-@token_auth.login_required
-def update_rack(id):
-    rack = Rack.query.get_or_404(id)
-    original_data = rack.to_dict()
-
-    data = request.get_json() or {}
-    rack.from_dict(data, new_rack=False)
-    db.session.commit()
-     #  audit.auditlog_update_post('rack', original_data=original_data, updated_data=rack.to_dict(), record_name=rack.name)
-
-    return jsonify(rack.to_dict())
+def get_crl(id):
+    return jsonify(Crl.query.get_or_404(id).to_dict())

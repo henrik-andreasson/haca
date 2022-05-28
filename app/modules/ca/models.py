@@ -1,9 +1,10 @@
 from app import db
 from app.modules.keys.models import Keys
 from app.modules.certificate.models import Certificate
+from app.main.models import PaginatedAPIMixin
 
 
-class CertificationAuthority(db.Model):
+class CertificationAuthority(PaginatedAPIMixin, db.Model):
     __tablename__ = "certification_authority"
     __searchable__ = ['name', 'comment']
 
@@ -37,6 +38,9 @@ class CertificationAuthority(db.Model):
             'keys_id': self.keys_id,
             'service_id': self.service_id,
             'approval': self.approval,
+            'cacert': self.certificate.cert,
+            'crl_cdp': self.crl_cdp,
+            'ocsp_url': self.ocsp_url,
             'comment': self.comment,
             }
         return data
