@@ -1,7 +1,8 @@
 from app import db
+from app.main.models import PaginatedAPIMixin
 
 
-class Ocsp(db.Model):
+class Ocsp(PaginatedAPIMixin, db.Model):
     __tablename__ = "ocsp"
     __searchable__ = ['name', 'status', 'comment']
     id = db.Column(db.Integer, primary_key=True)
