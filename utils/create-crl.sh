@@ -31,7 +31,7 @@ fi
 result=$(http --verify cacerts.pem POST "${API_URL}/crl" \
     "ca_name=${ca_name}" \
     "Authorization:Bearer $token")
-  echo $result
+  echo $result | jq .
   result_crl=$(echo $result | jq .crl | tr -d \" )
   echo ${result}      > "${ca_name}.log"
   echo "${result_crl@E}" > "${ca_name}.crl"

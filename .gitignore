@@ -8,6 +8,8 @@ logs/*log*
 ca-*
 utils/*crt
 utils/*ca
+utils/*crl
+utils/*ca
 utils/*key
 utils/.token
 

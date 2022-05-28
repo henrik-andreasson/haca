@@ -22,4 +22,4 @@ fi
 
 result=$(http --verify cacerts.pem "${API_URL}/crl/list" \
     "Authorization:Bearer $token")
-echo $result
+echo $result | jq .

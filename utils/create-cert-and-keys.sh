@@ -25,7 +25,7 @@ if [ "x$1" != "x" ] ; then
     csvfile=$1
 else
     echo "arg1 must be a file with cert definitions in it"
-    echo "name,userid,serial,orgunit,org,country,profile,sandns,service_name,ca_name"
+    echo "name,userid,serial,orgunit,org,country,profile,sandns,service_name,ca,status,validity_start,validity_end"
     exit
 fi
 
@@ -41,7 +41,7 @@ for row in $(cat "${csvfile}") ; do
   profile=$(echo $row | cut -f7 -d\,)
   sandns=$(echo $row | cut -f8 -d\,)
   service_name=$(echo $row | cut -f9 -d\,)
-  ca_name=$(echo $row | cut -f10 -d\,)
+  ca=$(echo $row | cut -f10 -d\,)
   status=$(echo $row | cut -f11 -d\,)
   validity_start=$(echo $row | cut -f12 -d\,)
   validity_end=$(echo $row | cut -f13 -d\,)
@@ -60,7 +60,7 @@ for row in $(cat "${csvfile}") ; do
     "profile=${profile}" \
     "sandns=${sandns}" \
     "service_name=${service_name}" \
-    "ca_name=${ca_name}" \
+    "ca=${ca}" \
     "status=${status}" \
     "validity_start=${validity_start}" \
     "validity_end=${validity_end}" \

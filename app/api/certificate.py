@@ -67,13 +67,13 @@ def create_cert():
     cert.service = service
 
     ca = None
-    if 'ca_name' in data:
-        ca = CertificationAuthority.query.filter_by(name=data['ca_name']).first()
-    elif 'ca_id' in data:
-        ca = CertificationAuthority.query.get(data['ca_id'])
+    if 'ca' in data:
+        ca = CertificationAuthority.query.filter_by(name=data['ca']).first()
+    else:
+        ca = CertificationAuthority.query.get(data['ca'])
 
     if ca is None:
-        return bad_request('must include ca_name or ca_id in fields')
+        return bad_request('must include ca with the name or id in fields')
 
     cert.ca = ca
     keys = Keys()
