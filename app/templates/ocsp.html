@@ -7,44 +7,25 @@
 <!-- display one cert -->
 
 
-  {% if cert %}
+  {% if ocsp %}
   <table class="table table-hover">
-    <tr>  <td>{{_('Inventory id')}}</td>         <td>   {{ cert.inventory_id() }}   </td> <td><A HREF="{{url_for('main.cert_edit', id=cert.id)}}"> {{ _('Edit') }}</A></td></tr>
-    <tr>  <td>{{_('Name')}}</td>                 <td>   {{ cert.name }}   </td>           <td></td></tr>
-    <tr>  <td>{{_('Status')}}</td>               <td>   {{ cert.status }}   </td>         <td></td></tr>
-    <tr>  <td>{{_('CA')}}</td>                   <td>   {{ cert.ca.name }}   </td>        <td></td></tr>
+    <tr>  <td>{{_('Inventory id')}}</td>         <td>   {{ ocsp.inventory_id() }}   </td> </tr>
+    <tr>  <td>{{_('Name')}}</td>                 <td>   {{ ocsp.name }}   </td>           </tr>
+    <tr>  <td>{{_('Status')}}</td>               <td>   {{ ocsp.status }}   </td>         </tr>
+    <tr>  <td>{{_('Validity Start')}}</td>       <td>   {{ ocsp.validity_start }}   </td>         </tr>
+    <tr>  <td>{{_('Validity End')}}</td>         <td>   {{ ocsp.validity_end }}   </td>         </tr>
+    <tr>  <td>{{_('CA')}}</td>                   <td>   {{ ocsp.ca.name }}   </td>        </tr>
 
                <tr>
-                 <td>{{_('Cert')}}</td>
+                 <td>{{_('OCSP Responder Cert')}}</td>
                  <td>
-<span id="cert">{{htmlcert}}</span>
+<span id="cert">{{ocsp.cert}}</span>
                  </td>
                  <td>
                    <button type="button" class="btn btn-primary" onclick="copyToClipboard('#cert', this)">{{_('Copy Certificate')}}</button>
                  </td>
                </tr>
-             {% if pemkey %}
-               <tr>
-                 <td>{{_('Key')}}</td>
-                 <td>
-<span id="key">{{pemkey}}</span>
-                 </td>
-                 <td>
-                   <button type="button" class="btn btn-primary" onclick="copyToClipboard('#key', this)">{{_('Copy Key')}}</button>
-                 </td>
-               </tr>
-             {% endif %}
 
-                 <tr>
-                   <td>{{_('CA Cert')}}
-                   </td>
-                   <td>
-<span id="ca">{{cert.ca.certificate.cert}}</span>
-                   </td>
-                   <td>
-                     <button type="button" class="btn btn-primary" onclick="copyToClipboard('#ca', this)">{{_('Copy CA cert')}}</button>
-                   </td>
-                 </tr>
 
   </table>
 

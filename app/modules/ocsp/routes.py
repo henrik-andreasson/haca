@@ -128,6 +128,23 @@ def ocsp_list():
                            prev_url=prev_url, form=form)
 
 
+@bp.route('/ocsp/info/<int:id>', methods=['GET', 'POST'])
+@login_required
+def ocsp_info(id):
+
+    if id is None:
+        flash(_('OCSP id missing!'))
+        return redirect(request.referrer)
+
+    ocsp = Ocsp.query.get(id)
+    if ocsp is None:
+        flash(_('OCSP id is missing!'))
+        return redirect(request.referrer)
+
+    return render_template('ocsp.html', title=_('OCSP'),
+                           ocsp=ocsp)
+
+
 @bp.route('/ocsp/query/', methods=['GET', 'POST'])
 def ocsp_query():
     start_query = datetime.now()

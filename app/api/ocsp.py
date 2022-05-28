@@ -1,186 +1,149 @@
 from app.api import bp
 from flask import jsonify
-from app.modules.safe.models import Safe, Compartment
+from app.modules.ocsp.models import Ocsp
 from app.main.models import User
 from flask import url_for
 from app import db
 from app.api.errors import bad_request
 from flask import request
 from app.api.auth import token_auth
+from app.modules.ca.models import CertificationAuthority
+from app.modules.certificate.models import Certificate
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509 import ocsp
+from app.main.models import Service
+from datetime import datetime
+from app.modules.keys.models import Keys
+from cryptography.hazmat.primitives import serialization
 
 
-@bp.route('/safe', methods=['POST'])
+@bp.route('/ocsp/add', methods=['POST'])
 @token_auth.login_required
-def create_safe():
+def ocsp_add():
     data = request.get_json() or {}
-    for field in ['name', 'location_id']:
+    for field in ['status', 'validity_start', 'validity_end']:
         if field not in data:
             return bad_request('must include field: %s' % field)
 
-    check_safe = Safe.query.filter_by(name=data['name']).first()
-    if check_safe is not None:
-        return bad_request('Safe already exist with id: %s' % check_safe.id)
+    check_ocsp = Ocsp.query.filter_by(name=data['name']).first()
+    if check_ocsp is not None:
+        return bad_request(f'OCSP responder with name {data["name"]} already exist with id: {check_ocsp.id}')
 
-    safe = Safe()
-    safe.from_dict(data)
+    # use ca to generate cert
+    ocsp_responder = Ocsp(status=data['status'],
+                          validity_start=datetime.strptime(data['validity_start'], "%Y-%m-%d"),
+                          validity_end=datetime.strptime(data['validity_end'], "%Y-%m-%d")
+                          )
+    certname_set = False
+    if 'name' in data:
+        ocsp_responder.name = data['name']
+        certname_set = True
+    if 'serial' in data:
+        ocsp_responder.serial = data['serial']
+        certname_set = True
+    if 'orgunit' in data:
+        ocsp_responder.orgunit = data['orgunit']
+        certname_set = True
+    if 'org' in data:
+        ocsp_responder.org = data['org']
+        certname_set = True
+    if 'country' in data:
+        ocsp_responder.country = data['country']
+        certname_set = True
 
-    db.session.add(safe)
+    ocsp_responder.profile = "ocsp"
+
+    # todo inline check, see auth username ...
+    if certname_set is False:
+        return bad_request('must include some name fields')
+
+    service = None
+    if 'service_name' in data:
+        service = Service.query.filter_by(name=data['service_name']).first()
+    elif 'service_id' in data:
+        service = Service.query.get(data['service_id'])
+
+    if service is None:
+        return bad_request('must include service_name or service_id in fields')
+    else:
+        ocsp_responder.service = service
+
+    ca = None
+    if 'ca' in data:
+        ca = CertificationAuthority.query.filter_by(name=data['ca']).first()
+    if ca is None:
+        ca = CertificationAuthority.query.get(data['ca'])
+    if ca is None:
+        return bad_request('must include ca_name or ca_id in fields')
+    else:
+        ocsp_responder.ca = ca
+
+    key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    keys = Keys(key=key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.BestAvailableEncryption(b"foo123")),
+            password=b"foo123")
+    signed = ca.create_cert(ocsp_responder, b"foo123", b"foo123", keys)
+
+    pemcert = signed.public_bytes(serialization.Encoding.PEM).decode()
+
+#        db.session.add(keys)
+    ocsp_responder.keys = keys
+    ocsp_responder.cert = pemcert
+
+    db.session.add(keys)
+    db.session.add(ocsp_responder)
     db.session.commit()
-     #  audit.auditlog_new_post('safe', original_data=safe.to_dict(), record_name=safe.name)
 
-    response = jsonify(safe.to_dict())
+    response = jsonify(ocsp_responder.to_dict())
 
     response.status_code = 201
-    response.headers['Safe'] = url_for('api.get_safe', id=safe.id)
+    response.headers['Ocsp'] = url_for('api.get_ocsp_by_id', id=ocsp_responder.id)
     return response
 
 
-@bp.route('/safe/<name>', methods=['GET'])
+@bp.route('/ocsp/<name>', methods=['GET'])
 @token_auth.login_required
-def get_safe_by_name(name):
+def get_ocsp_by_name(name):
 
-    check_safe = Safe.query.filter_by(name=name).first()
-    if check_safe is None:
-        return bad_request('Safe with name %s dont exist' % name)
+    ocsp_responder = Ocsp.query.filter_by(name=name).first()
+    if ocsp_responder is None:
+        return bad_request('OCSP responder with name %s dont exist' % name)
 
-    response = jsonify(check_safe.to_dict())
+    response = jsonify(ocsp_responder.to_dict())
 
     response.status_code = 201
     return response
 
 
-@bp.route('/safelist', methods=['GET'])
+@bp.route('/ocsp/<int:id>', methods=['GET'])
 @token_auth.login_required
-def get_safelist():
+def get_ocsp_by_id(id):
+    return jsonify(Ocsp.query.get_or_404(id).to_dict())
 
-    safes = Safe.query.all()
 
-    data = {
-        'items': [(item.id,) for item in safes],
-    }
+@bp.route('/ocsp/list', methods=['GET'])
+@token_auth.login_required
+def get_ocsp_list():
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 10, type=int), 100)
+    data = Ocsp.to_collection_dict(Ocsp.query, page, per_page, 'api.get_ocsp_list')
     return jsonify(data)
 
-
-@bp.route('/safe/<int:id>', methods=['GET'])
-@token_auth.login_required
-def get_safe(id):
-    return jsonify(Safe.query.get_or_404(id).to_dict())
-
-
-@bp.route('/safe/<int:id>', methods=['PUT'])
-@token_auth.login_required
-def update_safe(id):
-    safe = Safe.query.get_or_404(id)
-    original_data = safe.to_dict()
-
-    data = request.get_json() or {}
-    safe.from_dict(data, new_safe=False)
-    db.session.commit()
-     #  audit.auditlog_update_post('safe', original_data=original_data, updated_data=safe.to_dict(), record_name=safe.name)
-
-    return jsonify(safe.to_dict())
-
-
-@bp.route('/compartment', methods=['POST'])
-@token_auth.login_required
-def create_compartment():
-    data = request.get_json() or {}
-    if 'name' not in data:
-        return bad_request('must include field: name')
-
-    safe = 0
-    for field in ['safe_id', 'safe_name']:
-        if field in data:
-            safe = 1
-
-    if safe == 0:
-        return bad_request('must include safe_id or safe_name')
-
-    user = 0
-    for field in ['user_id', 'username']:
-        if field in data:
-            user = 1
-
-    if user == 0:
-        return bad_request('must include field user_id or username')
-
-    check_compartment = Compartment.query.filter_by(name=data['name']).first()
-    if check_compartment is not None:
-        return bad_request('Compartment already exist with id: %s' % check_compartment.id)
-
-    compartment = Compartment()
-    compartment.from_dict(data)
-
-    db.session.add(compartment)
-    db.session.commit()
-     #  audit.auditlog_new_post('compartment', original_data=compartment.to_dict(), record_name=compartment.name)
-
-    response = jsonify(compartment.to_dict())
-
-    response.status_code = 201
-    response.headers['Compartment'] = url_for('api.get_compartment', id=compartment.id)
-    return response
-
-
-@bp.route('/compartment/by-name/<name>', methods=['GET'])
-@token_auth.login_required
-def get_compartment_by_name(name):
-
-    compartment = Compartment.query.filter_by(name=name).first()
-    if compartment is None:
-        return bad_request('Compartment dont exist with name: %s' % name)
-
-    response = jsonify(compartment.to_dict())
-
-    response.status_code = 201
-    return response
-
-
-@bp.route('/compartment/by-user/<username>', methods=['GET'])
-@token_auth.login_required
-def get_compartment_by_user(username):
-
-    user = User.query.filter_by(username=username).first()
-    if user is None:
-        return bad_request('User dont exist with name: %s' % username)
-
-    compartments = Compartment.query.filter_by(user_id=user.id).all()
-    if compartments is None:
-        return bad_request('User has no compartments username: %s' % username)
-
-    data = {
-        'items': [(item.id,) for item in compartments],
-    }
-    return jsonify(data)
-
-
-@bp.route('/compartmentlist', methods=['GET'])
-@token_auth.login_required
-def get_compartmentlist():
-
-    compartments = Compartment.query.all()
-
-    data = {
-        'items': [(item.id,) for item in compartments],
-    }
-    return jsonify(data)
-
-
-@bp.route('/compartment/<int:id>', methods=['GET'])
-@token_auth.login_required
-def get_compartment(id):
-    return jsonify(Compartment.query.get_or_404(id).to_dict())
-
-
-@bp.route('/compartment/<int:id>', methods=['PUT'])
-@token_auth.login_required
-def update_compartment(id):
-    compartment = Compartment.query.get_or_404(id)
-    original_data = compartment.to_dict()
-
-    data = request.get_json() or {}
-    compartment.from_dict(data, new_compartment=False)
-    db.session.commit()
-     #  audit.auditlog_update_post('compartment', original_data=original_data, updated_data=compartment.to_dict(), record_name=compartment.name)
-
-    return jsonify(compartment.to_dict())
+#
+# @bp.route('/safe/<int:id>', methods=['PUT'])
+# @token_auth.login_required
+# def update_safe(id):
+#     safe = Safe.query.get_or_404(id)
+#     original_data = safe.to_dict()
+# # TODO: disable "old" OCSP:s
+#     data = request.get_json() or {}
+#     safe.from_dict(data, new_safe=False)
+#     db.session.commit()
+#      #  audit.auditlog_update_post('safe', original_data=original_data, updated_data=safe.to_dict(), record_name=safe.name)
+#
+#     return jsonify(safe.to_dict())

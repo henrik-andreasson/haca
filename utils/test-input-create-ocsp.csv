@@ -1,0 +1,2 @@
+#name,status,serial,orgunit,org,country,service_name,ca,validity_start,validity_end
+OCSP Responder asdf CA v2022,active,1233232,ou-ou-o,ooo,se,henrik,asdf,2022-05-27,2023-05-27

@@ -10,6 +10,7 @@ from app.modules.crl.models import Crl
 # from app.modules.approval.models import Approval
 from app.main import bp
 from datetime import datetime
+from app.modules.ocsp.models import Ocsp
 
 
 @bp.before_app_request
@@ -29,11 +30,13 @@ def index():
     certificates = Certificate.query.order_by(Certificate.name).limit(10)
     cas = CertificationAuthority.query.order_by(CertificationAuthority.name).limit(10)
     crls = Crl.query.order_by(Crl.id).limit(10)
+    ocsps = Ocsp.query.order_by(Ocsp.id).limit(10)
 
     return render_template('index.html', title=_('Explore'),
                            services=services, users=users,
                            certificates=certificates,
-                           crls=crls, cas=cas)
+                           crls=crls, cas=cas,
+                           ocsps=ocsps)
 
 
 @bp.route('/search', methods=['GET', 'POST'])

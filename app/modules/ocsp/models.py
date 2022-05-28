@@ -30,7 +30,9 @@ class Ocsp(db.Model):
             'id': self.id,
             'name': self.name,
             'status': self.status,
-            'certificate_id': self.certificate_id,
+            'cert': self.cert,
+            'validity_start': self.validity_start,
+            'validity_end': self.validity_end,
             'keys_id': self.keys_id,
             'ca_id': self.ca_id,
             'comment': self.comment
@@ -39,7 +41,7 @@ class Ocsp(db.Model):
 
     def from_dict(self, data, new_work=False):
 
-        for field in ['name', 'ca_id', 'status', 'comment', 'certificate_id', 'keys_id']:
+        for field in ['name', 'ca_id', 'status', 'comment', 'keys_id']:
             if field in data:
                 setattr(self, field, data[field])
 
