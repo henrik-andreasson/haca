@@ -135,14 +135,14 @@ def ca_list():
         #     cas = CertificationAuthority.query.filter_by(status=status).all()
         if service is not None:
             cas = CertificationAuthority.query.filter_by(service_id=service.id).paginate(
-                    page, current_app.config['POSTS_PER_PAGE'], False)
+                page = page, per_page = current_app.config['POSTS_PER_PAGE'])
         else:
             cas = CertificationAuthority.query.order_by(CertificationAuthority.name).paginate(
-                page, current_app.config['POSTS_PER_PAGE'], False)
+                page = page, per_page = current_app.config['POSTS_PER_PAGE'])
 
     else:
         cas = CertificationAuthority.query.order_by(CertificationAuthority.name).paginate(
-            page, current_app.config['POSTS_PER_PAGE'], False)
+            page = page, per_page = current_app.config['POSTS_PER_PAGE'])
 
     next_url = url_for('main.ca_list', page=cas.next_num) \
         if cas.has_next else None

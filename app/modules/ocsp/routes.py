@@ -106,7 +106,7 @@ def ocsp_list():
 
     ocsps1 = Ocsp.query.order_by(Ocsp.id).all()
     ocsps = Ocsp.query.order_by(Ocsp.id).paginate(
-            page, current_app.config['POSTS_PER_PAGE'], False)
+        page = page, per_page = current_app.config['POSTS_PER_PAGE'])
     for o in ocsps1:
         print(f'debug ocsp:{o.name}')
 
@@ -116,7 +116,7 @@ def ocsp_list():
             ca = CertificationAuthority.query.get(form.ca.data)
             if ca is not None:
                 ocsps = Ocsp.query.filter_by(ca_id=ca.id).paginate(
-                    page, current_app.config['POSTS_PER_PAGE'], False)
+                    page = page, per_page = current_app.config['POSTS_PER_PAGE'])
 
     next_url = url_for('main.cert_list', page=ocsps.next_num) \
         if ocsps.has_next else None

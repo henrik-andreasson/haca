@@ -52,7 +52,7 @@ def crl_list():
     page = request.args.get('page', 1, type=int)
 
     crls = Crl.query.order_by(Crl.id).paginate(
-            page, current_app.config['POSTS_PER_PAGE'], False)
+        page = page, per_page = current_app.config['POSTS_PER_PAGE'])
 
     next_url = url_for('main.rack_list', page=crls.next_num) \
         if crls.has_next else None
