@@ -28,7 +28,7 @@ service_user = db.Table('service_user',
 class PaginatedAPIMixin(object):
     @staticmethod
     def to_collection_dict(query, page, per_page, endpoint, **kwargs):
-        resources = query.paginate(page, per_page, False)
+        resources = query.paginate(page = page, per_page = per_page)
         print("page: %s per_page: %s endpoint %s" % (page, per_page, endpoint))
         data = {
             'items': [item.to_dict() for item in resources.items],

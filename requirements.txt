@@ -16,8 +16,6 @@ Flask-WTF-Ext
 Flask-HTTPAuth
 PyMySQL
 Flask-Babel
-flask-msearch
-whoosh
 blinker
 qrcode
 Image

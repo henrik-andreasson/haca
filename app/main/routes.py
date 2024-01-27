@@ -50,27 +50,7 @@ def search():
 
     users = []
     hits = []
-    if keyword is not None:
-        users = User.query.msearch(keyword, rank_order=False).all()
-        for u in users:
-            hit = {'title': u.username, 'module': 'User', 'text': u.about_me,
-                   'link': url_for('main.user', username=u.username)}
-            hits.append(hit)
 
-        services = Service.query.msearch(keyword, rank_order=False).all()
-        for s in services:
-            hit = {'title': s.name, 'module': 'Service', 'text': s.name,
-                   'link': url_for('main.service_get', servicename=s.name)}
-            hits.append(hit)
-
-        certificates = Certificate.query.msearch(keyword, rank_order=False).all()
-        for c in certificates:
-            hit = {'title': f'{c.name}',
-                   'module': 'Certificate', 'text': f'{c.name} - {c.name} - {c.name}',
-                   'link': url_for('main.certificate_view', id=c.id)}
-            hits.append(hit)
-
-# Switch
     return render_template('search.html', title=_('Search'),
                            hits=hits, form=form)
 

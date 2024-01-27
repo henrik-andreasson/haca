@@ -30,16 +30,3 @@ class Config(object):
     CERT_LOGIN = os.environ.get('CERT_LOGIN') or False
     CERT_DN_COMP_IS_USERNAME = os.environ.get('CERT_DN_COMP_IS_USERNAME') or "CN"
     PROXY_FIX = os.environ.get('PROXY_FIX') or 0
-
-    # flask-msearch will use table name as elasticsearch index name unless set __msearch_index__
-    MSEARCH_INDEX_NAME = 'msearch'
-    # simple,whoosh,elaticsearch, default is simple
-    MSEARCH_BACKEND = 'whoosh'
-    # table's primary key if you don't like to use id, or set __msearch_primary_key__ for special model
-    MSEARCH_PRIMARY_KEY = 'id'
-    # auto create or update index
-    MSEARCH_ENABLE = True
-    # logger level, default is logging.WARNING
-    MSEARCH_LOGGER = logging.DEBUG
-    # SQLALCHEMY_TRACK_MODIFICATIONS must be set to True when msearch auto index is enabled
-    SQLALCHEMY_TRACK_MODIFICATIONS = True
