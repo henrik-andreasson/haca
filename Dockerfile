@@ -4,7 +4,6 @@ FROM debian:latest
 # Set the working directory to /app
 WORKDIR /haca
 
-COPY . /haca
 
 # Install any needed packages
 RUN apt-get update
@@ -21,6 +20,8 @@ RUN pip3 install -r requirements.txt
 
 RUN apt-get clean
 RUN rm -rf /var/lib/apt/lists/*
+
+COPY . /haca
 
 # Make port available to the world outside this container
 EXPOSE 5000
